@@ -1,0 +1,2 @@
+recordingId,frameRate,locationId,speedLimit,month,weekDay,startTime,duration,totalDrivenDistance,totalDrivenTime,numVehicles,numCars,numTrucks,numBuses,laneMarkings,scale
+1,30,-1,-1,4.2021,Mon,0:00,327.27,176873.92,23408.7,1505,1361,134,10,refer to: 01_lanePicture,1 pixel = 0.0375 m
