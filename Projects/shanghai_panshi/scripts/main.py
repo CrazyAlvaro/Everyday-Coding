@@ -1,0 +1,139 @@
+import pandas as pd
+import sys
+import os
+
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
+# Add the parent directory of the script to the Python path
+# This is needed to import the package if you're running the script directly
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from processor import (
+    preprocessor, 
+    ego_interpolate, 
+    obj_augment, 
+    check_surrounding_objects,
+    calculate_ttc,
+    reference_matching,
+    track_data_generator
+)
+
+from metadata import(
+    lane_id_col, 
+    time_interpolate_columns, 
+    shift_interpolate_columns,
+    columns_tracks,
+    columns_recording_meta,
+    columns_tracks_meta
+)
+
+_log_level = "debug"
+_log_level = "run"
+
+def create_directory(path):
+    try:
+        os.makedirs(path, exist_ok=True)  # exist_ok=True prevents FileExistsError
+        print(f"Directory '{path}' created (or already existed).")
+    except OSError as error:
+        print(f"Error creating directory '{path}': {error}")
+
+def read_input(ego_file = "./ego.csv", obj_file = "./obj.csv"):
+    try:
+        df_ego = pd.read_csv(ego_file)
+        df_obj = pd.read_csv(obj_file)
+    except ValueError as e:
+        print(f"Reading input files failed: {e}")
+        exit(1)
+
+    if _log_level == "debug":
+        print("{}, {}".format(len(df_ego), len(df_obj)))
+
+    return df_ego, df_obj
+
+def write_output(pd_tracks, pd_tracks_meta, pd_recording_meta):
+    create_directory("./results")
+
+    try:
+        pd_tracks.to_csv('./results/tracks_result.csv', index=False)
+        pd_tracks_meta.to_csv('./results/tracks_meta_result.csv', index=False)
+        pd_recording_meta.to_csv('./results/recording_result.csv', index=False)
+
+        print("Output Files in ./Results/")
+    except OSError as error:
+        print("Error writing tracks output")
+
+def _data_processing(df_ego, df_obj, ego_obj_id):
+    _verbose = True if _log_level == "debug" else False
+    ###########################################
+    # augment ego data with timestamp in obj
+    ###########################################
+    df_ego_augment = preprocessor(df_ego, df_obj, ego_obj_id, lane_id_col, _verbose)
+
+    ###########################################
+    # interpolate ego columns 
+    ###########################################
+    df_ego_interpolated = ego_interpolate(df_ego_augment, time_interpolate_columns,shift_interpolate_columns, _verbose)
+
+    ###########################################
+    # concat df_obj with df_ego_interpolated
+    ###########################################
+    df_obj_augment = obj_augment(df_obj, df_ego_interpolated, ego_obj_id, _verbose) 
+
+    if _verbose:
+        print("=== main_1 === {}".format(len(df_obj_augment)))
+
+    ###########################################
+    # Reference re-match for obj values based on ego reference frame
+    ###########################################
+    df_obj_augment = reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose)
+
+    ###########################################
+    # Given obj and ego state value matched on the same reference frame
+    # check each vehicle's surrounding objects at each timestamp
+    ###########################################
+    df_obj_augment = check_surrounding_objects(df_obj_augment)
+
+    ###########################################
+    # calculate ttc, thw 
+    ###########################################
+    df_obj_augment = calculate_ttc(df_obj_augment)
+
+    # df_obj_augment.to_csv("nine_box_tracks.csv")
+
+    return track_data_generator(df_obj_augment, columns_tracks, columns_tracks_meta, columns_recording_meta)
+    
+def args_handler():
+    ego_file = "./ego.csv"
+    obj_file = "./obj.csv"
+
+    if len(sys.argv) > 1:
+        print("Arguments passed:", sys.argv[1:])  # Print all arguments except the script name
+
+        # Accessing specific arguments
+        if len(sys.argv) > 2:
+            ego_file = sys.argv[1]
+            obj_file = sys.argv[2]
+            print(f"ego file: {ego_file}, obj file: {obj_file}")
+        else:
+            print("Please provide both ego and obj file path.")
+    else:
+        print("No ego and obj file path provided.") 
+    
+    print(f"file path: {ego_file} {obj_file}")
+    return ego_file, obj_file
+
+if __name__ == "__main__":
+    ego_file, obj_file = args_handler()
+
+    print("==================================================================================\n")
+    print(" 4 Steps: Reference_Matching, Checking_Surroundings, TTC_THW, Tracks_Stats\n")
+    print("==================================================================================\n")
+
+    ego_obj_id = 1
+
+    df_ego, df_obj = read_input(ego_file, obj_file)
+
+    pd_tracks, pd_tracks_meta, pd_recording = _data_processing(df_ego, df_obj, ego_obj_id)
+
+    write_output(pd_tracks, pd_tracks_meta, pd_recording)
