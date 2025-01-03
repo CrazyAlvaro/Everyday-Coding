@@ -28,8 +28,8 @@ from metadata import(
     columns_tracks_meta
 )
 
-_log_level = "debug"
 _log_level = "run"
+_log_level = "debug"
 
 def create_directory(path):
     try:
@@ -47,7 +47,7 @@ def read_input(ego_file = "./ego.csv", obj_file = "./obj.csv"):
         exit(1)
 
     if _log_level == "debug":
-        print("{}, {}".format(len(df_ego), len(df_obj)))
+        print("ego len: {}, obj len: {}".format(len(df_ego), len(df_obj)))
 
     return df_ego, df_obj
 
@@ -101,7 +101,7 @@ def _data_processing(df_ego, df_obj, ego_obj_id):
 
     # df_obj_augment.to_csv("nine_box_tracks.csv")
 
-    return track_data_generator(df_obj_augment, columns_tracks, columns_tracks_meta, columns_recording_meta)
+    return track_data_generator(df_obj_augment, columns_tracks, columns_recording_meta)
     
 def args_handler():
     ego_file = "./ego.csv"

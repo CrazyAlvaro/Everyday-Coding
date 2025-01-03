@@ -22,11 +22,13 @@ def preprocessor(df_ego, df_obj, ego_obj_id, lane_id_col, _verbose=False):
     ts_obj = df_obj['ts'].unique()
     ts_ego = df_ego['ts'].unique()
     ts_obj_not_ego = [ts for ts in ts_obj if ts not in ts_ego]
+    ts_obj_and_ego = [ts for ts in ts_obj if ts in ts_ego]
 
     if _verbose:
         print(f"unique ts in obj: {len(ts_obj)}")
         print(f"unique ts in ego: {len(ts_ego)}")
         print(f"unique ts in obj_not_ego: {len(ts_obj_not_ego)}")
+        print(f"unique ts in obj_and_ego: {len(ts_obj_and_ego)}")
 
     # augment ego with ts in obj
     df_obj_ts = pd.DataFrame(np.array(ts_obj_not_ego), columns=['ts'])
@@ -51,7 +53,7 @@ def preprocessor(df_ego, df_obj, ego_obj_id, lane_id_col, _verbose=False):
 
     if _verbose:
         print("========= preprocessor ===========")
-        df_ego_augment.to_csv('./data/ego_augment.csv', index=False)
+        df_ego_augment.to_csv('./debug/ego_augment.csv', index=False)
 
     return df_ego_augment
 
@@ -65,13 +67,14 @@ def ego_interpolate(df_ego_interpolated, time_intrplt_cols, shift_intrplt_cols, 
     # set ego length, width to 0, since we don't know
     df_ego_interpolated['length'] = 0
     df_ego_interpolated['width']  = 0
+    df_ego_interpolated['height']  = 0
     
     # assume ego is car
     df_ego_interpolated['class_str']  = 'car' 
 
     if _verbose:
         print("========= ego_interpolate ===========")
-        df_ego_interpolated.to_csv('./data/ego_augment_interpolated.csv', index=False)
+        df_ego_interpolated.to_csv('./debug/ego_augment_interpolated.csv', index=False)
     
     return df_ego_interpolated
 
@@ -96,7 +99,7 @@ def obj_augment(df_obj, df_ego_interpolated, ego_obj_id, _verbose=False):
     df_obj_augment.loc[df_obj_augment['obj_id'] == ego_obj_id, 'vel_lat_mps'] = 0
 
     if _verbose:
-        df_obj_augment.to_csv('./data/obj_augment.csv', index=True)
+        df_obj_augment.to_csv('./debug/obj_augment.csv', index=True)
 
     return df_obj_augment
 
@@ -198,15 +201,23 @@ def _calculate_track_statistics(df_tracks):
         min_thw = group['thw'].min()
         min_ttc = group['ttc'].min()
 
+        # Count lane changes within same 'road_id' (simple approach)
+        num_lane_changes = 0
+        for _, road_group in group.groupby('roadId'):
+          curr_lane_diff = road_group['laneId'].diff().dropna()
+          num_lane_changes += (curr_lane_diff != 0).sum()
+
         # Count lane changes (simple approach)
-        lane_diff = group['laneId'].diff().dropna()
-        num_lane_changes = (lane_diff != 0).sum()
+        # lane_diff = group['laneId'].diff().dropna()
+        # num_lane_changes = (lane_diff != 0).sum()
 
         # Create a dictionary for track statistics
         track_stats.append({
             'id': track_id,
+            'obj_id': first_row['obj_id'],
+            'length': first_row['length'],
             'width': first_row['width'],
-            'height': first_row['length'],
+            'height': first_row['height'],
             'initialFrame': initial_frame,
             'finalFrame': final_frame,
             'numFrames': len(group),
@@ -311,7 +322,7 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
 
     # print(df_obj_augment.head)
     if _verbose:
-        df_obj_augment.to_csv('./data/obj_before_first_trav.csv')
+        df_obj_augment.to_csv('./debug/obj_before_first_trav.csv')
 
     # create all columns_tracks in df_obj_augment if needed
     df_obj_augment = _ensure_columns_exist_robust(df_obj_augment, columns_tracks)
@@ -328,37 +339,40 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
             # check curr_obj_idx and curr_ego_idx timestamp matched
             assert df_obj_augment.loc[curr_obj_idx, 'ts'] == df_obj_augment.loc[curr_ego_idx, 'ts'], "object {} and ego {} timestamp not match".format(curr_obj_idx, curr_ego_idx)
 
-            # NOTE x, y 
-            df_obj_augment.loc[curr_obj_idx, 'x'] = df_obj_augment.loc[curr_ego_idx, 'x'] + df_obj_augment.loc[curr_obj_idx, 'lat']
-            df_obj_augment.loc[curr_obj_idx, 'y'] = df_obj_augment.loc[curr_ego_idx, 'y'] + df_obj_augment.loc[curr_obj_idx, 'lgt']
-
+            # NOTE update according to curr_ego_h
+            # NOTE compute all x, y, xVelocity, yVelocity, xAcceleration, yAcceleration from ground-reference-frame
+            _x, _y = _rotate_vector(df_obj_augment.loc[idx, 'lgt'], df_obj_augment.loc[idx, 'lat'], curr_ego_h)
+            df_obj_augment.loc[curr_obj_idx, 'x'] = df_obj_augment.loc[curr_ego_idx, 'x'] + _x
+            df_obj_augment.loc[curr_obj_idx, 'y'] = df_obj_augment.loc[curr_ego_idx, 'y'] + _y
+    
+            _xVel, _yVel = _rotate_vector(df_obj_augment.loc[idx, 'vel_lgt_mps'], df_obj_augment.loc[idx, 'vel_lat_mps'], curr_ego_h)
+            df_obj_augment.loc[curr_obj_idx, 'xVelocity'] = df_obj_augment.loc[curr_ego_idx, 'xVelocity'] + _xVel
+            df_obj_augment.loc[curr_obj_idx, 'yVelocity'] = df_obj_augment.loc[curr_ego_idx, 'yVelocity'] + _yVel
+        
+            _xAcc, _yAcc = _rotate_vector(df_obj_augment.loc[idx, 'acc_lgt_mpss'], df_obj_augment.loc[idx, 'acc_lat_mpss'], curr_ego_h)
+            df_obj_augment.loc[curr_obj_idx, 'xAcceleration'] = df_obj_augment.loc[curr_ego_idx, 'xAcceleration'] + _xAcc
+            df_obj_augment.loc[curr_obj_idx, 'yAcceleration'] = df_obj_augment.loc[curr_ego_idx, 'yAcceleration'] + _yAcc
+            
             # flag column updated
             df_obj_augment.loc[curr_obj_idx, updated_col] = True 
-
+    
         # ego
         else: 
             # print("update curr_ego_idx: {}".format(idx))
             curr_ego_idx = idx
             curr_ego_h = df_obj_augment.loc[curr_ego_idx, 'h']
-
+    
             # update ego frame vel_lgt_mps, vel_lat_mps for later computation
-            df_obj_augment.loc[curr_ego_idx, 'vel_lgt_mps'] = df_obj_augment.loc[curr_ego_idx, 'spd_mps']
-            df_obj_augment.loc[curr_ego_idx, 'vel_lat_mps'] = 0
+            df_obj_augment.loc[curr_ego_idx, 'xVelocity'] = df_obj_augment.loc[curr_ego_idx, 'spd_mps']
+            df_obj_augment.loc[curr_ego_idx, 'yVelocity'] = 0
+    
+            _xAcc, _yAcc = _rotate_vector(df_obj_augment.loc[idx, 'acc_lgt_mpss'], df_obj_augment.loc[idx, 'acc_lat_mpss'], curr_ego_h)
+            df_obj_augment.loc[curr_ego_idx, 'xAcceleration'] = _xAcc
+            df_obj_augment.loc[curr_ego_idx, 'yAcceleration'] = _yAcc
 
         # NOTE xCenter, yCenter
         df_obj_augment.loc[idx, 'xCenter'] = df_obj_augment.loc[idx, 'x'] 
         df_obj_augment.loc[idx, 'yCenter'] = df_obj_augment.loc[idx, 'y'] 
-
-        # NOTE xVelocity, yVelocity, xAcceleration, yAcceleration
-        # update according to curr_ego_h
-        # compute all xVelocity, yVelocity, xAcceleration, yAcceleration from ground-reference-frame
-        _xVel, _yVel = _rotate_vector(df_obj_augment.loc[idx, 'vel_lgt_mps'], df_obj_augment.loc[idx, 'vel_lat_mps'], curr_ego_h)
-        df_obj_augment.loc[idx, 'xVelocity'] = _xVel
-        df_obj_augment.loc[idx, 'yVelocity'] = _yVel
-
-        _xAcc, _yAcc = _rotate_vector(df_obj_augment.loc[idx, 'acc_lgt_mpss'], df_obj_augment.loc[idx, 'acc_lat_mpss'], curr_ego_h)
-        df_obj_augment.loc[idx, 'xAcceleration'] = _xAcc
-        df_obj_augment.loc[idx, 'yAcceleration'] = _yAcc
 
         # angle: cannot calculate w/out lane info
         df_obj_augment.loc[idx, 'angle'] = 0
@@ -376,20 +390,25 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
         df_obj_augment.loc[idx, 'ego_offset'] = 0
 
     if _verbose: 
-        df_obj_augment.to_csv('./data/obj_first_trav.csv')
+        df_obj_augment.to_csv('./debug/obj_first_trav.csv')
 
     return df_obj_augment
 
 
-def track_data_generator(df_obj_augment, cols_tracks, cols_tracks_meta, cols_recording_meta, _verbose=False):
+def track_data_generator(df_obj_augment, cols_tracks, cols_recording_meta, _verbose=False):
     df_tracks = _create_tracks(df_obj_augment)
 
     # Construct 3 output dataframes
     pd_recording_meta = pd.DataFrame(columns=cols_recording_meta)
-    pd_tracks_meta = pd.DataFrame(columns=cols_tracks_meta)
+    # pd_tracks_meta = pd.DataFrame(columns=cols_tracks_meta)
     pd_tracks = pd.DataFrame(columns=cols_tracks)
 
+    # rename some columns
     df_tracks['laneId'] = df_tracks['lane_id']
+    df_tracks['roadId'] = df_tracks['road_id']
+    df_tracks['timestamp'] = df_tracks['ts']
+    df_tracks['vehicle_id'] = df_tracks['obj_id']
+    df_tracks['yaw'] = df_tracks['h']
 
     # set for 0, not in use
     df_tracks['frontSightDistance'] = 0
@@ -405,5 +424,7 @@ def track_data_generator(df_obj_augment, cols_tracks, cols_tracks_meta, cols_rec
 
     # drop class_str for meta computation purpose
     pd_tracks.drop('class_str', axis=1, inplace=True)
+    # drop obj_id which is contained in pd_reacks_meta
+    pd_tracks.drop('obj_id', axis=1, inplace=True)
 
     return pd_tracks, pd_tracks_meta, pd_recording_meta
