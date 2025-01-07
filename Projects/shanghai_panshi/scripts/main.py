@@ -1,6 +1,7 @@
 import pandas as pd
 import sys
 import os
+import json
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -28,8 +29,8 @@ from metadata import(
     columns_tracks_meta
 )
 
-_log_level = "run"
 _log_level = "debug"
+_log_level = "run"
 
 def create_directory(path):
     try:
@@ -63,7 +64,7 @@ def write_output(pd_tracks, pd_tracks_meta, pd_recording_meta):
     except OSError as error:
         print("Error writing tracks output")
 
-def _data_processing(df_ego, df_obj, ego_obj_id):
+def _data_processing(df_ego, df_obj, ego_obj_id, ego_config):
     _verbose = True if _log_level == "debug" else False
     ###########################################
     # augment ego data with timestamp in obj
@@ -73,12 +74,12 @@ def _data_processing(df_ego, df_obj, ego_obj_id):
     ###########################################
     # interpolate ego columns 
     ###########################################
-    df_ego_interpolated = ego_interpolate(df_ego_augment, time_interpolate_columns,shift_interpolate_columns, _verbose)
+    df_ego_interpolated = ego_interpolate(df_ego_augment, time_interpolate_columns,shift_interpolate_columns, ego_config, _verbose)
 
     ###########################################
     # concat df_obj with df_ego_interpolated
     ###########################################
-    df_obj_augment = obj_augment(df_obj, df_ego_interpolated, ego_obj_id, _verbose) 
+    df_obj_augment = obj_augment(df_obj, df_ego_interpolated, _verbose) 
 
     if _verbose:
         print("=== main_1 === {}".format(len(df_obj_augment)))
@@ -123,8 +124,24 @@ def args_handler():
     print(f"file path: {ego_file} {obj_file}")
     return ego_file, obj_file
 
+def ego_config_handler():
+    with open('ego_config.json', 'r') as file:
+        _ego_data = json.load(file)
+    
+    required_keys = {"height", "width", "length"}
+
+    # validate 
+    if required_keys.issubset(_ego_data.keys()):
+        print("Ego config all keys are present.")
+    else:
+        missing_keys = required_keys - _ego_data.keys()
+        print(f"Missing ego keys: {missing_keys}")
+
+    return _ego_data
+
 if __name__ == "__main__":
     ego_file, obj_file = args_handler()
+    ego_data = ego_config_handler()
 
     print("==================================================================================\n")
     print(" 4 Steps: Reference_Matching, Checking_Surroundings, TTC_THW, Tracks_Stats\n")
@@ -132,8 +149,11 @@ if __name__ == "__main__":
 
     ego_obj_id = 1
 
+    # File Input
     df_ego, df_obj = read_input(ego_file, obj_file)
 
-    pd_tracks, pd_tracks_meta, pd_recording = _data_processing(df_ego, df_obj, ego_obj_id)
+    # Data Prcess and Tracks Generate
+    pd_tracks, pd_tracks_meta, pd_recording = _data_processing(df_ego, df_obj, ego_obj_id, ego_data)
 
+    # File Output
     write_output(pd_tracks, pd_tracks_meta, pd_recording)

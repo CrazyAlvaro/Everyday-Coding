@@ -57,7 +57,7 @@ def preprocessor(df_ego, df_obj, ego_obj_id, lane_id_col, _verbose=False):
 
     return df_ego_augment
 
-def ego_interpolate(df_ego_interpolated, time_intrplt_cols, shift_intrplt_cols, _verbose=False):
+def ego_interpolate(df_ego_interpolated, time_intrplt_cols, shift_intrplt_cols, ego_config, _verbose=False):
     for col in time_intrplt_cols:
         df_ego_interpolated[col] = df_ego_interpolated[col].interpolate(method='time')
     
@@ -65,9 +65,9 @@ def ego_interpolate(df_ego_interpolated, time_intrplt_cols, shift_intrplt_cols, 
         df_ego_interpolated[col] = df_ego_interpolated[col].ffill()
     
     # set ego length, width to 0, since we don't know
-    df_ego_interpolated['length'] = 0
-    df_ego_interpolated['width']  = 0
-    df_ego_interpolated['height']  = 0
+    df_ego_interpolated['length'] = ego_config['length'] 
+    df_ego_interpolated['width']  = ego_config['width'] 
+    df_ego_interpolated['height']  = ego_config['height'] 
     
     # assume ego is car
     df_ego_interpolated['class_str']  = 'car' 
@@ -78,7 +78,7 @@ def ego_interpolate(df_ego_interpolated, time_intrplt_cols, shift_intrplt_cols, 
     
     return df_ego_interpolated
 
-def obj_augment(df_obj, df_ego_interpolated, ego_obj_id, _verbose=False):
+def obj_augment(df_obj, df_ego_interpolated, _verbose=False):
 
     if _verbose:
         print("========= obj_augment ===========")
@@ -92,11 +92,6 @@ def obj_augment(df_obj, df_ego_interpolated, ego_obj_id, _verbose=False):
     # sort all vehicles by ts-timestamp value
     df_obj_augment.sort_values(by='ts', inplace=True)
 
-    # sort dataframe for reviewing
-    
-    # set ego vel_lgt_mps, vel_lat_mps
-    df_obj_augment.loc[df_obj_augment['obj_id'] == ego_obj_id, 'vel_lgt_mps'] = df_obj_augment['spd_mps']
-    df_obj_augment.loc[df_obj_augment['obj_id'] == ego_obj_id, 'vel_lat_mps'] = 0
 
     if _verbose:
         df_obj_augment.to_csv('./debug/obj_augment.csv', index=True)
@@ -314,6 +309,10 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
     df_obj_augment.sort_values(by='ts', inplace=True, kind='stable')
     df_obj_augment.reset_index(drop=True, inplace=True)
 
+    # set ego vel_lgt_mps, vel_lat_mps
+    df_obj_augment.loc[df_obj_augment['obj_id'] == ego_obj_id, 'vel_lgt_mps'] = df_obj_augment['spd_mps']
+    df_obj_augment.loc[df_obj_augment['obj_id'] == ego_obj_id, 'vel_lat_mps'] = 0
+
     # First traverse to calculate the x, y, z, and speed, acceleration respectively.
     updated_col = 'updated'
     df_obj_augment[updated_col] = False 
@@ -361,10 +360,16 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
             # print("update curr_ego_idx: {}".format(idx))
             curr_ego_idx = idx
             curr_ego_h = df_obj_augment.loc[curr_ego_idx, 'h']
+
+            # update x, y from rear axis middle point to center of the ego vehicle 
+            _x, _y = _rotate_vector(df_obj_augment.loc[idx, 'length']/2, 0, curr_ego_h)
+            df_obj_augment.loc[curr_ego_idx, 'x'] = df_obj_augment.loc[curr_ego_idx, 'x'] + _x
+            df_obj_augment.loc[curr_ego_idx, 'y'] = df_obj_augment.loc[curr_ego_idx, 'y'] + _y
     
             # update ego frame vel_lgt_mps, vel_lat_mps for later computation
-            df_obj_augment.loc[curr_ego_idx, 'xVelocity'] = df_obj_augment.loc[curr_ego_idx, 'spd_mps']
-            df_obj_augment.loc[curr_ego_idx, 'yVelocity'] = 0
+            _xVel, _yVel = _rotate_vector(df_obj_augment.loc[curr_ego_idx, 'spd_mps'], 0, curr_ego_h)
+            df_obj_augment.loc[curr_ego_idx, 'xVelocity'] = _xVel
+            df_obj_augment.loc[curr_ego_idx, 'yVelocity'] = _yVel 
     
             _xAcc, _yAcc = _rotate_vector(df_obj_augment.loc[idx, 'acc_lgt_mpss'], df_obj_augment.loc[idx, 'acc_lat_mpss'], curr_ego_h)
             df_obj_augment.loc[curr_ego_idx, 'xAcceleration'] = _xAcc

@@ -60,7 +60,7 @@ def _check_vehicle_sides(df, current_index, lookahead_factor=2.0):
    
     # Filter DataFrame to consider only vehicles within a reasonable time window
     # (e.g., vehicles within the last few seconds)
-    time_window = 10**6  # 1 second,  10**6, unit: microsecond
+    time_window = 0.1**6  # total time_window would be 0.1*2 = 0.2 second, original unit: microsecond
     filtered_df = df[(df['ts'] >= current_timestamp - time_window) & (df['ts'] <= current_timestamp + time_window)] 
    
     for index, row in filtered_df.iterrows():

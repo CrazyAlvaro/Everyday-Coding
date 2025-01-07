@@ -6,3 +6,5 @@ babel.js
 *.class
 *.log
 *.pyc
+*.zip
+*.csv
