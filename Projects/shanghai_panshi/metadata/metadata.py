@@ -26,3 +26,8 @@ columns_recording_meta = ['recordingId', 'frameRate', 'locationId', 'speedLimit'
 time_interpolate_columns = ['x','y','z','h','spd_mps', 'spd_kph', 'acc_lgt_mpss', 'acc_lat_mpss']
 
 shift_interpolate_columns = ['road_id', 'lane_id']
+
+obj_time_cols = ['lgt', 'lat', 'x', 'y', 'z', 'h', 'vel_lgt_mps', 'vel_lat_mps', 
+                             'speed_direction','acc_lgt_mpss', 'acc_lat_mpss', 'acc_direction']
+
+obj_shift_cols = ['obj_id', 'class', 'class_str', 'length', 'width', 'height', 'road_id', 'lane_id']

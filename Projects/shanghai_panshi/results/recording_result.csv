@@ -1,1 +1,2 @@
-recordingId,frameRate,locationId,speedLimit,month,weekDay,startTime,duration,totalDrivenDistance,totalDrivenTime,numVehicles,numCars,numTrucks,numBuses,laneMarkings,scale
+recordingId,frameRate,locationId,speedLimit,month,weekDay,startTime,duration,totalDrivenDistance,totalDrivenTime,numVehicles,numCars,numTrucks,numBusus,laneMarkings,scale
+0,100,0,0,0,0,0,0,0,0,0,0,0,0,0,0

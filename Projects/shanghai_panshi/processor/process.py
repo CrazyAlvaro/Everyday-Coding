@@ -1,6 +1,7 @@
 import math
 import pandas as pd
 import numpy as np
+from bisect import bisect_left, bisect_right
 from tqdm import tqdm
 
 def preprocessor(df_ego, df_obj, ego_obj_id, lane_id_col, _verbose=False):
@@ -55,7 +56,7 @@ def preprocessor(df_ego, df_obj, ego_obj_id, lane_id_col, _verbose=False):
         print("========= preprocessor ===========")
         df_ego_augment.to_csv('./debug/ego_augment.csv', index=False)
 
-    return df_ego_augment
+    return df_ego_augment, ts_ego 
 
 def ego_interpolate(df_ego_interpolated, time_intrplt_cols, shift_intrplt_cols, ego_config, _verbose=False):
     for col in time_intrplt_cols:
@@ -78,25 +79,79 @@ def ego_interpolate(df_ego_interpolated, time_intrplt_cols, shift_intrplt_cols, 
     
     return df_ego_interpolated
 
-def obj_augment(df_obj, df_ego_interpolated, _verbose=False):
+
+def _get_timestamp_range(_timestamps, target_timestamps, _key='ts'):
+    """
+    return the timestamp range from df_timestamps for target_timestamps
+    Example:
+        min, max = target_timestamps.min(), target_timestamps.max()
+        return [lowerbound(df_timestamps, min), upperbound(df_timestamps, max)]
+    """
+    _ts_min, _ts_max = target_timestamps.min(), target_timestamps.max()
+
+    sorted_arr = np.sort(_timestamps)
+
+    _lower_bound = max(0, bisect_left(sorted_arr, _ts_min))
+    _upper_bound = min(len(sorted_arr), bisect_right(sorted_arr, _ts_max))
+
+    return sorted_arr[_lower_bound:_upper_bound] 
+
+def obj_augment(df_obj, df_ego_interpolated, ts_ego, obj_time_cols, obj_shift_cols, _verbose=False):
+
+    # construct output dataframe
+    df_output = df_ego_interpolated.copy()
+
+    # Filter row only with original ts
+    df_output = df_output[df_output['ts'].isin(ts_ego)] 
 
     if _verbose:
         print("========= obj_augment ===========")
-        print("df_obj {} df_ego_interpolated {}".format(len(df_obj), len(df_ego_interpolated)))
-    # concat df_ego_augment to df_obj for late obj axis transform to ground axis
-    df_obj_augment = pd.concat([df_obj, df_ego_interpolated], axis=0)
+        print("df_obj {} df_ego{}".format(len(df_obj), len(df_output)))
+
+    ## START
+    for _obj_id, _df_group in tqdm(df_obj.groupby('obj_id'), desc="Augment Obj timestamps"):
+        if _obj_id == 1:
+            continue 
+
+        _df_group.sort_values(by='ts', inplace=True)
+
+        # get corresponding timestamp range from df_ego
+        _group_ts = _df_group['ts']
+        _group_ts_ego_range = _get_timestamp_range(ts_ego, _group_ts)
+
+        # print(_group_ts_ego_range)
+        _group_new_ts = [ts for ts in _group_ts_ego_range if ts not in _group_ts]
+
+        # augment current obj_id within all timestamp
+        _df_group_ego_ts = pd.DataFrame(np.array(_group_new_ts), columns=['ts'])
+        _df_group_augment = pd.concat([_df_group, _df_group_ego_ts], axis=0, ignore_index=True)
+
+        # sort by ts and reindex
+        _df_group_augment['timestamp'] = pd.to_datetime(_df_group_augment['ts'])
+        _df_group_augment.set_index('timestamp', inplace=True)
+
+        # interpolate by time
+        for col in obj_time_cols:
+            _df_group_augment[col] = _df_group_augment[col].interpolate(method='time')
+
+        # interpolate by shift
+        for col in  obj_shift_cols:
+            _df_group_augment[col] = _df_group_augment[col].ffill()
+        
+        # contain timestamp that is only in original ts_ego 
+        _df_group_augment = _df_group_augment[_df_group_augment['ts'].isin(ts_ego)] 
+
+        # drop duplicate ts
+        _df_group_augment = _df_group_augment.drop_duplicates(subset=['ts'], keep='first')
+
+        # LOOP_END add to output dataframe
+        df_output = pd.concat([df_output, _df_group_augment], axis=0, ignore_index=True)
+    # END
 
     if _verbose:
-        print("df_obj_augment {}".format(len(df_obj_augment)))
-    
-    # sort all vehicles by ts-timestamp value
-    df_obj_augment.sort_values(by='ts', inplace=True)
+        df_output.to_csv('./debug/obj_augment.csv', index=True)
 
-
-    if _verbose:
-        df_obj_augment.to_csv('./debug/obj_augment.csv', index=True)
-
-    return df_obj_augment
+    return df_output 
 
 def _ensure_columns_exist_robust(df, column_names, verbose=False):
     """
@@ -174,9 +229,6 @@ def _calculate_track_statistics(df_tracks):
     track_stats = []
     for track_id, group in tqdm(df_tracks.groupby('trackId'), desc="Tracks Statistics: "):
         first_row = group.iloc[0] 
-        # Get initial and final frame
-        initial_frame = group['frame'].min()
-        final_frame = group['frame'].max()
 
         # Calculate the differences between consecutive points
         group['x_diff'] = group['xCenter'].diff()
@@ -213,8 +265,8 @@ def _calculate_track_statistics(df_tracks):
             'length': first_row['length'],
             'width': first_row['width'],
             'height': first_row['height'],
-            'initialFrame': initial_frame,
-            'finalFrame': final_frame,
+            'initialFrame': group['frame'].min(),
+            'finalFrame': group['frame'].max(),
             'numFrames': len(group),
             'class': first_row['class_str'],
             'drivingDirection': 2 if first_row['laneId'] >= 0 else 1,
@@ -256,7 +308,7 @@ def calculate_ttc(df):
             df.loc[index, 'thw'] = 0
     return df
 
-def _create_tracks(df):
+def _create_tracks(df, _frame_dict):
     """
     Assigns unique track IDs and frame numbers to objects in a DataFrame.
 
@@ -295,8 +347,9 @@ def _create_tracks(df):
 
         df.loc[index, _track_ID] = track_id_map[object_id]
 
-    # Calculate frame numbers within each track
-    df[_frame] = df.groupby(_track_ID).cumcount()
+        # position frame within each track from timestamp
+        df.loc[index, _frame] = _frame_dict[row[_timestamp]]
+
     return df
 
 
@@ -325,7 +378,6 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
 
     # create all columns_tracks in df_obj_augment if needed
     df_obj_augment = _ensure_columns_exist_robust(df_obj_augment, columns_tracks)
-
 
     obj_id_col = 'obj_id'
     for idx in tqdm(range(len(df_obj_augment)-1), desc="Reference Matching: "): 
@@ -399,12 +451,35 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
 
     return df_obj_augment
 
+def construct_recording(frame_rate):
+    _recordings = []
+    _recordings.append({
+        "recordingId": 0,
+        "frameRate": frame_rate,
+        "locationId": 0,
+        "speedLimit": 0,
+        "month": 0,
+        "weekDay": 0,
+        "startTime":0,
+        "duration": 0,
+        "totalDrivenDistance": 0,
+        "totalDrivenTime": 0,
+        "numVehicles": 0,
+        "numCars": 0,
+        "numTrucks": 0,
+        "numBusus": 0,
+        "laneMarkings": 0,
+        "scale": 0
+    })
 
-def track_data_generator(df_obj_augment, cols_tracks, cols_recording_meta, _verbose=False):
-    df_tracks = _create_tracks(df_obj_augment)
+    return pd.DataFrame(_recordings)
+    
+def track_data_generator(df_obj_augment, ego_timestamps, cols_tracks, cols_recording_meta, frame_rate, _verbose=False):
+    _frame_dict = {timestamp: index for index, timestamp in enumerate(np.sort(ego_timestamps))}
+    df_tracks = _create_tracks(df_obj_augment, _frame_dict)
 
     # Construct 3 output dataframes
-    pd_recording_meta = pd.DataFrame(columns=cols_recording_meta)
+    # pd_recording_meta = pd.DataFrame(columns=cols_recording_meta)
     # pd_tracks_meta = pd.DataFrame(columns=cols_tracks_meta)
     pd_tracks = pd.DataFrame(columns=cols_tracks)
 
@@ -431,5 +506,7 @@ def track_data_generator(df_obj_augment, cols_tracks, cols_recording_meta, _verb
     pd_tracks.drop('class_str', axis=1, inplace=True)
     # drop obj_id which is contained in pd_reacks_meta
     pd_tracks.drop('obj_id', axis=1, inplace=True)
+
+    pd_recording_meta = construct_recording(frame_rate)
 
     return pd_tracks, pd_tracks_meta, pd_recording_meta

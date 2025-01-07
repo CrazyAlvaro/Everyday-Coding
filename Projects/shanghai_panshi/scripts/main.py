@@ -26,6 +26,8 @@ from metadata import(
     shift_interpolate_columns,
     columns_tracks,
     columns_recording_meta,
+    obj_time_cols,
+    obj_shift_cols,
     columns_tracks_meta
 )
 
@@ -66,47 +68,56 @@ def write_output(pd_tracks, pd_tracks_meta, pd_recording_meta):
 
 def _data_processing(df_ego, df_obj, ego_obj_id, ego_config):
     _verbose = True if _log_level == "debug" else False
+    df_ego.sort_values(by='ts', inplace=True)
+    _ego_timestamps = df_ego['ts']
+
+    _frame_rate = int(10**9 / (_ego_timestamps[1] - _ego_timestamps[0]))
+    # print(_frame_rate)
+
     ###########################################
     # augment ego data with timestamp in obj
     ###########################################
-    df_ego_augment = preprocessor(df_ego, df_obj, ego_obj_id, lane_id_col, _verbose)
+    _df_ego_augment, _ts_ego= preprocessor(df_ego, df_obj, ego_obj_id, lane_id_col, _verbose)
 
     ###########################################
     # interpolate ego columns 
     ###########################################
-    df_ego_interpolated = ego_interpolate(df_ego_augment, time_interpolate_columns,shift_interpolate_columns, ego_config, _verbose)
+    _df_ego_interpolated = ego_interpolate(_df_ego_augment, time_interpolate_columns,shift_interpolate_columns, ego_config, _verbose)
 
     ###########################################
-    # concat df_obj with df_ego_interpolated
+    # concat df_obj with _df_ego_interpolated
+    # for each obj_id, augment timestamp with 
+    # range include all timestamps using ego frame rate
     ###########################################
-    df_obj_augment = obj_augment(df_obj, df_ego_interpolated, _verbose) 
+    _df_obj_augment = obj_augment(df_obj, _df_ego_interpolated, _ts_ego, obj_time_cols, obj_shift_cols, _verbose) 
 
     if _verbose:
-        print("=== main_1 === {}".format(len(df_obj_augment)))
+        print("=== main_1 === {}".format(len(_df_obj_augment)))
 
     ###########################################
     # Reference re-match for obj values based on ego reference frame
     ###########################################
-    df_obj_augment = reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose)
+    _df_obj_ref = reference_matching(_df_obj_augment, ego_obj_id, columns_tracks, _verbose)
 
     ###########################################
     # Given obj and ego state value matched on the same reference frame
     # check each vehicle's surrounding objects at each timestamp
     ###########################################
-    df_obj_augment = check_surrounding_objects(df_obj_augment)
+    _df_obj_srd = check_surrounding_objects(_df_obj_ref)
 
     ###########################################
     # calculate ttc, thw 
     ###########################################
-    df_obj_augment = calculate_ttc(df_obj_augment)
+    _df_obj_cal = calculate_ttc(_df_obj_srd)
 
     # df_obj_augment.to_csv("nine_box_tracks.csv")
 
-    return track_data_generator(df_obj_augment, columns_tracks, columns_recording_meta)
+    return track_data_generator(_df_obj_cal, _ego_timestamps, columns_tracks, columns_recording_meta, _frame_rate)
     
 def args_handler():
     ego_file = "./ego.csv"
     obj_file = "./obj.csv"
+    ego_config_file = "./ego_config.json"
 
     if len(sys.argv) > 1:
         print("Arguments passed:", sys.argv[1:])  # Print all arguments except the script name
@@ -115,17 +126,18 @@ def args_handler():
         if len(sys.argv) > 2:
             ego_file = sys.argv[1]
             obj_file = sys.argv[2]
-            print(f"ego file: {ego_file}, obj file: {obj_file}")
+            ego_config_file = sys.argv[3]
+            print(f"ego file: {ego_file}, obj file: {obj_file}, ego_config file: {ego_config_file}")
         else:
-            print("Please provide both ego and obj file path.")
+            print("Please provide ego, obj and ego_config 3 files' path.")
     else:
         print("No ego and obj file path provided.") 
     
-    print(f"file path: {ego_file} {obj_file}")
-    return ego_file, obj_file
+    print(f"file path: \n ego file: {ego_file}\n obj file: {obj_file}\n ego_config file: {ego_config_file}")
+    return ego_file, obj_file, ego_config_file
 
-def ego_config_handler():
-    with open('ego_config.json', 'r') as file:
+def ego_config_handler(ego_config_file):
+    with open(ego_config_file, 'r') as file:
         _ego_data = json.load(file)
     
     required_keys = {"height", "width", "length"}
@@ -140,11 +152,11 @@ def ego_config_handler():
     return _ego_data
 
 if __name__ == "__main__":
-    ego_file, obj_file = args_handler()
-    ego_data = ego_config_handler()
+    ego_file, obj_file, ego_config_file = args_handler()
+    ego_data = ego_config_handler(ego_config_file)
 
     print("==================================================================================\n")
-    print(" 4 Steps: Reference_Matching, Checking_Surroundings, TTC_THW, Tracks_Stats\n")
+    print(" 5 Steps: Obj_Augment, Reference_Matching, Checking_Surroundings, TTC_THW, Tracks_Stats\n")
     print("==================================================================================\n")
 
     ego_obj_id = 1

@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 
-def _check_vehicle_sides(df, current_index, lookahead_factor=2.0):
+def _check_vehicle_sides(df, current_index, lookahead_factor=3.0):
     """
     Checks for vehicles in 8 directions (front, back, left_following, 
     left_preceding, left_alongside, right_preceding, right_following, right_alongside) 
@@ -60,8 +60,11 @@ def _check_vehicle_sides(df, current_index, lookahead_factor=2.0):
    
     # Filter DataFrame to consider only vehicles within a reasonable time window
     # (e.g., vehicles within the last few seconds)
-    time_window = 0.1**6  # total time_window would be 0.1*2 = 0.2 second, original unit: microsecond
-    filtered_df = df[(df['ts'] >= current_timestamp - time_window) & (df['ts'] <= current_timestamp + time_window)] 
+    # time_window = 0.1**6  # total time_window would be 0.1*2 = 0.2 second, original unit: microsecond
+    # filtered_df = df[(df['ts'] >= current_timestamp - time_window) & (df['ts'] <= current_timestamp + time_window)] 
+
+    # Filter DataFrame to consider matching timestamp
+    filtered_df = df[df['ts'] == current_timestamp] 
    
     for index, row in filtered_df.iterrows():
         if index == current_index:
