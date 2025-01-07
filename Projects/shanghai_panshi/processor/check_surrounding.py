@@ -1,6 +1,20 @@
 import numpy as np
 from tqdm import tqdm
 
+def _angle_between_vectors(v1, v2):
+    """
+    Calculates the angle between two vectors in degrees.
+
+    Args:
+      v1: The first vector as a NumPy array.
+      v2: The second vector as a NumPy array.
+
+    Returns:
+      The angle between the vectors in degrees.
+    """
+    cos_theta = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+    return np.degrees(np.arccos(np.clip(cos_theta, -1.0, 1.0)))
+
 def _check_vehicle_sides(df, current_index, lookahead_factor=3.0):
     """
     Checks for vehicles in 8 directions (front, back, left_following, 
@@ -87,9 +101,9 @@ def _check_vehicle_sides(df, current_index, lookahead_factor=3.0):
         for direction, direction_unit_vector in directions.items():
             # loop through all directions
    
-            dot_product = np.dot(direction_vector, direction_unit_vector)
+            # dot_product = np.dot(direction_vector, direction_unit_vector)
    
-            if dot_product < 0:
+            if abs(_angle_between_vectors(direction_vector, direction_unit_vector)) > 22.5:
                 # not on the same direction
                 continue
 
