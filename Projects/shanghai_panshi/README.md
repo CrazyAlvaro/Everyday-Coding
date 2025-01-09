@@ -7,3 +7,13 @@ Command: python -m scripts.main [ego_file obj_file]
 Install Required Packages: pip install -r requirements.txt
 
 Output: ./Results/
+
+
+
+##########################
+
+## Test
+
+inside ./test directory, run:
+
+- streamlit run validator.py

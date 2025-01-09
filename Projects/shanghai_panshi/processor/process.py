@@ -260,7 +260,7 @@ def _calculate_track_statistics(df_tracks):
 
         # Create a dictionary for track statistics
         track_stats.append({
-            'id': track_id,
+            'trackId': track_id,
             'obj_id': first_row['obj_id'],
             'length': first_row['length'],
             'width': first_row['width'],
@@ -380,7 +380,7 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
     df_obj_augment = _ensure_columns_exist_robust(df_obj_augment, columns_tracks)
 
     obj_id_col = 'obj_id'
-    for idx in tqdm(range(len(df_obj_augment)-1), desc="Reference Matching: "): 
+    for idx in tqdm(range(len(df_obj_augment)), desc="Reference Matching: "): 
         # print("current idx: {}".format(idx))
 
         # obj
@@ -437,9 +437,9 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
         # orientation
         df_obj_augment.loc[idx, 'orientation'] = df_obj_augment.loc[idx, 'h'] 
 
-        # yaw_rate ~= yAcc / xVel
-        if df_obj_augment.loc[idx, 'xVelocity'] != 0:
-            df_obj_augment.loc[idx, 'yaw_rate'] = df_obj_augment.loc[idx, 'yAcceleration'] / df_obj_augment.loc[idx, 'xVelocity']
+        # yaw_rate ~= yAcc / xAcc
+        if df_obj_augment.loc[idx, 'xAcceleration'] != 0:
+            df_obj_augment.loc[idx, 'yaw_rate'] = df_obj_augment.loc[idx, 'yAcceleration'] / df_obj_augment.loc[idx, 'xAcceleration']
         else:
             df_obj_augment.loc[idx, 'yaw_rate'] = 0
 

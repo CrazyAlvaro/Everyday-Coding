@@ -15,6 +15,57 @@ def _angle_between_vectors(v1, v2):
     cos_theta = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
     return np.degrees(np.arccos(np.clip(cos_theta, -1.0, 1.0)))
 
+def _normalize_vector(heading_x, heading_y):
+    """
+    Normalizes a 2D vector.
+
+    Args:
+      heading_x: The x-component of the vector.
+      heading_y: The y-component of the vector.
+
+    Returns:
+      A tuple containing the normalized x and y components of the vector.
+    """
+    magnitude = np.sqrt(heading_x**2 + heading_y**2)
+    # print("heading_x {} heading_y {}".format(heading_x, heading_y))
+    if magnitude == 0:
+      return 0, 0  # Handle the case where the vector is zero
+    else:
+      normalized_heading_x = heading_x / magnitude
+      normalized_heading_y = heading_y / magnitude
+      return normalized_heading_x, normalized_heading_y
+
+def _get_all_directions(heading_x, heading_y):
+    """
+    Calculates 8 directional vectors given an initial heading vector.
+
+    Args:
+      heading_x: The x-component of the initial heading vector.
+      heading_y: The y-component of the initial heading vector.
+
+    Returns:
+      A list of 8 tuples, each representing a normalized direction vector 
+      (x, y) in the order: 
+      front, back, left, right, left_front, left_back, right_front, right_back.
+    """
+
+    # Normalize the initial heading vector
+    heading_x, heading_y = _normalize_vector(heading_x, heading_y)
+
+    # Calculate angles for each direction (in radians)
+    angles = np.arange(0, 2*np.pi, np.pi/4)  # 8 directions, 45 degrees each
+
+    # Rotate the initial vector to get all directions
+    all_directions = []
+    for angle in angles:
+      cos_theta = np.cos(angle)
+      sin_theta = np.sin(angle)
+      new_x = heading_x * cos_theta - heading_y * sin_theta
+      new_y = heading_x * sin_theta + heading_y * cos_theta
+      all_directions.append((new_x, new_y))
+
+    return all_directions
+
 def _check_vehicle_sides(df, current_index, lookahead_factor=3.0):
     """
     Checks for vehicles in 8 directions (front, back, left_following, 
@@ -45,19 +96,21 @@ def _check_vehicle_sides(df, current_index, lookahead_factor=3.0):
     lookahead_distance = current_speed * lookahead_factor 
    
     # Calculate unit vectors for current vehicle's direction
-    heading_x = np.cos(np.radians(current_row['orientation']))
-    heading_y = np.sin(np.radians(current_row['orientation']))
+    # heading_x = np.cos(np.radians(current_row['orientation']))
+    # heading_y = np.sin(np.radians(current_row['orientation']))
+
+    _directions = _get_all_directions(x_velocity, y_velocity)
    
     # Define unit vectors for all directions
     directions = {
-        'front': np.array([heading_x, heading_y]),
-        'back': -np.array([heading_x, heading_y]),
-        'left_alongside': np.array([-heading_y, heading_x]), 
-        'left_preceding': np.array([heading_x-heading_y, heading_x+heading_y]),   # 'front' + 'left_alongside'
-        'left_following': np.array([-heading_x-heading_y, heading_x-heading_y]),  # 'back'  + 'left_alongside'
-        'right_alongside': np.array([heading_y, -heading_x]),
-        'right_preceding': np.array([heading_x+heading_y, -heading_x+heading_y]), # 'front' + 'right_alongside'
-        'right_following': np.array([-heading_x+heading_y, -heading_x-heading_y]) # 'back'  + 'right_alongside'
+        'front': _directions[0],
+        'left_preceding': _directions[1],
+        'left_alongside': _directions[2],
+        'left_following': _directions[3],
+        'back': _directions[4],
+        'right_following': _directions[5],
+        'right_alongside': _directions[6],
+        'right_preceding': _directions[7] 
     }
    
     # Initialize results
@@ -118,13 +171,13 @@ def _check_vehicle_sides(df, current_index, lookahead_factor=3.0):
    
     return vehicle_ids
 
-def check_surrounding_objects(df):
+def check_surrounding_objects(df, lookahead_factor=3):
     """
     Assuming 'df' is your DataFrame with 
     'ts', 'x', 'y', 'orientation', 'obj_id', 'xVelocity', 'yVelocity' columns
     """
     for _index in tqdm(df.index, desc="Checking Surroundings: "):
-        surrounding_results = _check_vehicle_sides(df, _index) 
+        surrounding_results = _check_vehicle_sides(df, _index, lookahead_factor) 
 
         # update precedingId, dhw, precedingXVelocity
         df.loc[_index, 'precedingId'] = surrounding_results['front'][0]
