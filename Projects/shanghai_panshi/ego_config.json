@@ -2,5 +2,6 @@
     "length": 4.9,
     "width": 1.98,
     "height": 1.68,
-    "lookahead": 3
+    "lookahead": 3,
+    "lookahead_min": 10
 }

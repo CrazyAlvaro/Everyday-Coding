@@ -397,12 +397,12 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
             df_obj_augment.loc[curr_obj_idx, 'y'] = df_obj_augment.loc[curr_ego_idx, 'y'] + _y
     
             _xVel, _yVel = _rotate_vector(df_obj_augment.loc[idx, 'vel_lgt_mps'], df_obj_augment.loc[idx, 'vel_lat_mps'], curr_ego_h)
-            df_obj_augment.loc[curr_obj_idx, 'xVelocity'] = df_obj_augment.loc[curr_ego_idx, 'xVelocity'] + _xVel
-            df_obj_augment.loc[curr_obj_idx, 'yVelocity'] = df_obj_augment.loc[curr_ego_idx, 'yVelocity'] + _yVel
+            df_obj_augment.loc[curr_obj_idx, 'xVelocity'] =  _xVel
+            df_obj_augment.loc[curr_obj_idx, 'yVelocity'] =  _yVel
         
             _xAcc, _yAcc = _rotate_vector(df_obj_augment.loc[idx, 'acc_lgt_mpss'], df_obj_augment.loc[idx, 'acc_lat_mpss'], curr_ego_h)
-            df_obj_augment.loc[curr_obj_idx, 'xAcceleration'] = df_obj_augment.loc[curr_ego_idx, 'xAcceleration'] + _xAcc
-            df_obj_augment.loc[curr_obj_idx, 'yAcceleration'] = df_obj_augment.loc[curr_ego_idx, 'yAcceleration'] + _yAcc
+            df_obj_augment.loc[curr_obj_idx, 'xAcceleration'] =  _xAcc
+            df_obj_augment.loc[curr_obj_idx, 'yAcceleration'] =  _yAcc
             
             # flag column updated
             df_obj_augment.loc[curr_obj_idx, updated_col] = True 

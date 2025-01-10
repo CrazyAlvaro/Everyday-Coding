@@ -66,7 +66,7 @@ def write_output(pd_tracks, pd_tracks_meta, pd_recording_meta):
     except OSError as error:
         print("Error writing tracks output")
 
-def _data_processing(df_ego, df_obj, ego_obj_id, ego_config, lookahead):
+def _data_processing(df_ego, df_obj, ego_obj_id, ego_config):
     _verbose = True if _log_level == "debug" else False
     df_ego.sort_values(by='ts', inplace=True)
     _ego_timestamps = df_ego['ts']
@@ -103,7 +103,7 @@ def _data_processing(df_ego, df_obj, ego_obj_id, ego_config, lookahead):
     # Given obj and ego state value matched on the same reference frame
     # check each vehicle's surrounding objects at each timestamp
     ###########################################
-    _df_obj_srd = check_surrounding_objects(_df_obj_ref, lookahead)
+    _df_obj_srd = check_surrounding_objects(_df_obj_ref, ego_config)
 
     ###########################################
     # calculate ttc, thw 
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     df_ego, df_obj = read_input(ego_file, obj_file)
 
     # Data Prcess and Tracks Generate
-    pd_tracks, pd_tracks_meta, pd_recording = _data_processing(df_ego, df_obj, ego_obj_id, ego_data, ego_data['lookahead'])
+    pd_tracks, pd_tracks_meta, pd_recording = _data_processing(df_ego, df_obj, ego_obj_id, ego_data)
 
     # File Output
     write_output(pd_tracks, pd_tracks_meta, pd_recording)

@@ -5,6 +5,24 @@ import streamlit as st
 import matplotlib.pyplot as plt
 # import matplotlib.colors as colors
 
+def convert_df_to_int64(df):
+    """
+    Converts all numeric columns in a DataFrame to np.int64.
+
+    Args:
+      df: The pandas DataFrame to convert.
+
+    Returns:
+      A new DataFrame with all numeric columns converted to np.int64.
+    """
+
+    df_int64 = df.copy()  # Create a copy to avoid modifying the original DataFrame
+
+    for col in df_int64.columns:
+      if pd.api.types.is_numeric_dtype(df_int64[col]):
+        df_int64[col] = df_int64[col].astype(np.int64)
+
+    return df_int64
 
 def load_data(file):
     # 读取CSV文件
@@ -43,10 +61,7 @@ def plot_data(data, frame):
     print("Current frame: {} with data length {}".format(frame_id, len(filtered_data)))
 
     # 创建画布
-    fig, ax = plt.subplots(figsize=(10, 8))
-
-    filtered_data['trackId'] = filtered_data['trackId'].astype(int)
-    filtered_data['vehicle_id'] = filtered_data['vehicle_id'].astype(int)
+    fig, ax = plt.subplots(figsize=(12, 10))
 
     # 绘制散点图，每个点代表一个trackID
     scatter = ax.scatter(filtered_data['xCenter'], filtered_data['yCenter'])
@@ -65,15 +80,21 @@ def plot_data(data, frame):
         # print(type(filtered_data['trackId']))
         curr_track_id  = filtered_data['trackId'].iloc[i]
         plt.text(x, y, f"tkId: {curr_track_id}")
-    
-    correspondence_table = filtered_data[['trackId', 'vehicle_id']]
 
-    table = plt.table(cellText=correspondence_table.values,
-                  colLabels=correspondence_table.columns,
+    correspondence_table = filtered_data[['trackId', 'vehicle_id', 'precedingId',
+                                          'followingId', 'leftPrecedingId', 'leftAlongsideId', 'leftFollowingId',
+                                          'rightPrecedingId', 'rightAlongsideId', 'rightFollowingId',
+                                          'laneId']]
+    
+    table_df = convert_df_to_int64(correspondence_table)
+
+    table = plt.table(cellText=table_df.values,
+                  colLabels=table_df.columns,
                   loc='bottom', cellLoc='center',
-                  bbox=[0, -0.5, 1, 0.4])
+                  bbox=[-0.5, -0.5, 1.8, 0.4])
+    table.auto_set_font_size(False)
     table.set_fontsize(12)  # 设置字体大小
-    table.scale(2, 1.5)  # 调整表格大小
+    table.scale(4, 3.5)  # 调整表格大小
 
     # 添加标题和坐标轴标签
     ax.set_title(f'Track Positions and Velocities at frame: {frame_id}')

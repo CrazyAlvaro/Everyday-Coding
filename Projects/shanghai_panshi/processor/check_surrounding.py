@@ -66,7 +66,7 @@ def _get_all_directions(heading_x, heading_y):
 
     return all_directions
 
-def _check_vehicle_sides(df, current_index, lookahead_factor=3.0):
+def _check_vehicle_sides(df, current_index, lookahead_factor=3.0, lookahead_min=15):
     """
     Checks for vehicles in 8 directions (front, back, left_following, 
     left_preceding, left_alongside, right_preceding, right_following, right_alongside) 
@@ -94,10 +94,9 @@ def _check_vehicle_sides(df, current_index, lookahead_factor=3.0):
     # Calculate lookahead distance based on speed
     current_speed     = np.sqrt(x_velocity**2 + y_velocity**2)
     lookahead_distance = current_speed * lookahead_factor 
+    lookahead_distance = max(lookahead_distance, lookahead_min)
    
     # Calculate unit vectors for current vehicle's direction
-    # heading_x = np.cos(np.radians(current_row['orientation']))
-    # heading_y = np.sin(np.radians(current_row['orientation']))
 
     _directions = _get_all_directions(x_velocity, y_velocity)
    
@@ -171,13 +170,17 @@ def _check_vehicle_sides(df, current_index, lookahead_factor=3.0):
    
     return vehicle_ids
 
-def check_surrounding_objects(df, lookahead_factor=3):
+def check_surrounding_objects(df, ego_config):
     """
     Assuming 'df' is your DataFrame with 
     'ts', 'x', 'y', 'orientation', 'obj_id', 'xVelocity', 'yVelocity' columns
     """
+
+    lookahead_factor = ego_config['lookahead']
+    lookahead_min = ego_config['lookahead_min']
+
     for _index in tqdm(df.index, desc="Checking Surroundings: "):
-        surrounding_results = _check_vehicle_sides(df, _index, lookahead_factor) 
+        surrounding_results = _check_vehicle_sides(df, _index, lookahead_factor, lookahead_min) 
 
         # update precedingId, dhw, precedingXVelocity
         df.loc[_index, 'precedingId'] = surrounding_results['front'][0]
