@@ -301,8 +301,11 @@ def calculate_ttc(df):
             relative_velocity = row['xVelocity'] - row['precedingXVelocity'] 
             if relative_velocity > 0:  # Ego vehicle is faster than preceding vehicle
                 df.loc[index, 'ttc'] = row['dhw'] / relative_velocity
-
-            df.loc[index, 'thw'] = row['dhw'] / row['xVelocity']
+            elif row['xVelocity'] != 0:
+                df.loc[index, 'thw'] = row['dhw'] / row['xVelocity']
+            else:
+                # current xVelocity == 0
+                df.loc[index, 'thw'] = np.inf 
         else:
             # no preceding vehicle exist
             df.loc[index, 'thw'] = 0

@@ -98,7 +98,11 @@ def _check_vehicle_sides(df, current_index, lookahead_factor=3.0, lookahead_min=
    
     # Calculate unit vectors for current vehicle's direction
 
-    _directions = _get_all_directions(x_velocity, y_velocity)
+    if np.linalg.norm((x_velocity, y_velocity)) == 0:
+      # if no velocity, set to current ground axis pos-x direction
+      _directions = _get_all_directions(1, 0)
+    else:
+      _directions = _get_all_directions(x_velocity, y_velocity)
    
     # Define unit vectors for all directions
     directions = {
