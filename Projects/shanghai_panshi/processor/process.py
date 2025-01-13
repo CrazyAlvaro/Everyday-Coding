@@ -4,17 +4,18 @@ import numpy as np
 from bisect import bisect_left, bisect_right
 from tqdm import tqdm
 
-def preprocessor(df_ego, df_obj, ego_obj_id, lane_id_col, _verbose=False):
+def preprocessor(df_ego, df_obj, ego_obj_id, shift_intrplt_cols, _verbose=False):
     # df_ego 加入 obj_id 字段 取 1
     df_ego['obj_id'] = ego_obj_id 
 
     # NOTE: Assume we have laneId 
-    # add column 'laneId' to both ego and obj if needed
-    if lane_id_col not in df_ego.columns:
-        df_ego[lane_id_col] = 0
+    # add column 'road_id' and 'laneId' to both ego and obj if needed
+    for _col in shift_intrplt_cols:
+        if _col not in df_ego.columns:
+            df_ego[_col] = 0
 
-    if lane_id_col not in df_obj.columns:
-        df_obj[lane_id_col] = 0
+        if _col not in df_obj.columns:
+            df_obj[_col] = 0
 
     ###########################################
     # Preprocessing
@@ -351,7 +352,11 @@ def _create_tracks(df, _frame_dict):
         df.loc[index, _track_ID] = track_id_map[object_id]
 
         # position frame within each track from timestamp
-        df.loc[index, _frame] = _frame_dict[row[_timestamp]]
+        _np_int_ts = np.int64(row[_timestamp]) 
+        if _np_int_ts not in _frame_dict.keys():
+            print("NOTE: skip timestamp not in ego timestamps")
+            continue
+        df.loc[index, _frame] = _frame_dict[_np_int_ts]
 
     return df
 

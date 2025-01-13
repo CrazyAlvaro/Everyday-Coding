@@ -21,7 +21,6 @@ from processor import (
 )
 
 from metadata import(
-    lane_id_col, 
     time_interpolate_columns, 
     shift_interpolate_columns,
     columns_tracks,
@@ -41,7 +40,7 @@ def create_directory(path):
     except OSError as error:
         print(f"Error creating directory '{path}': {error}")
 
-def read_input(ego_file = "./ego.csv", obj_file = "./obj.csv"):
+def read_input(ego_file = "ego.csv", obj_file = "obj.csv"):
     try:
         df_ego = pd.read_csv(ego_file)
         df_obj = pd.read_csv(obj_file)
@@ -58,11 +57,11 @@ def write_output(pd_tracks, pd_tracks_meta, pd_recording_meta):
     create_directory("./results")
 
     try:
-        pd_tracks.to_csv('./results/tracks_result.csv', index=False)
-        pd_tracks_meta.to_csv('./results/tracks_meta_result.csv', index=False)
-        pd_recording_meta.to_csv('./results/recording_result.csv', index=False)
+        pd_tracks.to_csv('results/tracks_result.csv', index=False)
+        pd_tracks_meta.to_csv('results/tracks_meta_result.csv', index=False)
+        pd_recording_meta.to_csv('results/recording_result.csv', index=False)
 
-        print("Output Files in ./Results/")
+        print("Output Files in Results/")
     except OSError as error:
         print("Error writing tracks output")
 
@@ -77,7 +76,7 @@ def _data_processing(df_ego, df_obj, ego_obj_id, ego_config):
     ###########################################
     # augment ego data with timestamp in obj
     ###########################################
-    _df_ego_augment, _ts_ego= preprocessor(df_ego, df_obj, ego_obj_id, lane_id_col, _verbose)
+    _df_ego_augment, _ts_ego= preprocessor(df_ego, df_obj, ego_obj_id, shift_interpolate_columns, _verbose)
 
     ###########################################
     # interpolate ego columns 
@@ -115,9 +114,9 @@ def _data_processing(df_ego, df_obj, ego_obj_id, ego_config):
     return track_data_generator(_df_obj_cal, _ego_timestamps, columns_tracks, columns_recording_meta, _frame_rate)
     
 def args_handler():
-    ego_file = "./ego.csv"
-    obj_file = "./obj.csv"
-    ego_config_file = "./ego_config.json"
+    ego_file = "ego.csv"
+    obj_file = "obj.csv"
+    ego_config_file = "ego_config.json"
 
     if len(sys.argv) > 1:
         print("Arguments passed:", sys.argv[1:])  # Print all arguments except the script name

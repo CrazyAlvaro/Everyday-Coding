@@ -3,7 +3,6 @@
 ###########################################
 
 # Assume laneId provided in preceeding data processor
-lane_id_col = 'lane_id'
 
 columns_tracks = ['frame', 'trackId', 'timestamp', 'vehicle_id', 'obj_id', 'xCenter', 'yCenter', 'length', 'width',
                 'height', 'xVelocity', 'yVelocity', 'xAcceleration', 'yAcceleration',
