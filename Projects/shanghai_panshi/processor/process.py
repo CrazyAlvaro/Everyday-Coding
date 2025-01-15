@@ -511,7 +511,9 @@ def track_data_generator(df_obj_augment, ego_timestamps, cols_tracks, cols_recor
     pd_tracks_meta = _calculate_track_statistics(pd_tracks)
 
     # drop class_str for meta computation purpose
-    pd_tracks.drop('class_str', axis=1, inplace=True)
+    # pd_tracks.drop('class_str', axis=1, inplace=True)
+
+
     # drop obj_id which is contained in pd_reacks_meta
     pd_tracks.drop('obj_id', axis=1, inplace=True)
 
