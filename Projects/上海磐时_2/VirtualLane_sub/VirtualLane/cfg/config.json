@@ -1,0 +1,17 @@
+{
+    "obj_file": "./result/object.csv",
+    "valid_trajectories_file": "./result/valid_trajectories.csv",
+    "vehicle_with_cluster_id": "./result/vehicle_with_cluster_id.csv",
+    "lane_boundaries": "./result/lane_boundaries.csv",
+    "params": {
+        "T1": 50,
+        "T2": 20,
+        "T3": 20,
+        "lateral_threshold": 3,
+        "yaw_rate_threshold": 0.2,
+        "ay_threshold": 0.5,
+        "variability_threshold": 0.30,
+        "eps": 1.75,
+        "min_samples": 2
+    }
+}
