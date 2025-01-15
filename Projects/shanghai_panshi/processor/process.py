@@ -55,7 +55,7 @@ def preprocessor(df_ego, df_obj, ego_obj_id, shift_intrplt_cols, _verbose=False)
 
     if _verbose:
         print("========= preprocessor ===========")
-        df_ego_augment.to_csv('./debug/ego_augment.csv', index=False)
+        df_ego_augment.to_csv('debug/ego_augment.csv', index=False)
 
     return df_ego_augment, ts_ego 
 
@@ -76,7 +76,7 @@ def ego_interpolate(df_ego_interpolated, time_intrplt_cols, shift_intrplt_cols, 
 
     if _verbose:
         print("========= ego_interpolate ===========")
-        df_ego_interpolated.to_csv('./debug/ego_augment_interpolated.csv', index=False)
+        df_ego_interpolated.to_csv('debug/ego_augment_interpolated.csv', index=False)
     
     return df_ego_interpolated
 
@@ -150,7 +150,7 @@ def obj_augment(df_obj, df_ego_interpolated, ts_ego, obj_time_cols, obj_shift_co
     # END
 
     if _verbose:
-        df_output.to_csv('./debug/obj_augment.csv', index=True)
+        df_output.to_csv('debug/obj_augment.csv', index=True)
 
     return df_output 
 
@@ -382,7 +382,7 @@ def reference_matching(df_obj_augment, ego_obj_id, columns_tracks, _verbose=Fals
 
     # print(df_obj_augment.head)
     if _verbose:
-        df_obj_augment.to_csv('./debug/obj_before_first_trav.csv')
+        df_obj_augment.to_csv('debug/obj_before_first_trav.csv')
 
     # create all columns_tracks in df_obj_augment if needed
     df_obj_augment = _ensure_columns_exist_robust(df_obj_augment, columns_tracks)

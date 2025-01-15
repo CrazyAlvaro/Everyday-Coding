@@ -54,7 +54,7 @@ def read_input(ego_file = "ego.csv", obj_file = "obj.csv"):
     return df_ego, df_obj
 
 def write_output(pd_tracks, pd_tracks_meta, pd_recording_meta):
-    create_directory("./results")
+    create_directory("results")
 
     try:
         pd_tracks.to_csv('results/tracks_result.csv', index=False)
