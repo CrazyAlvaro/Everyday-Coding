@@ -150,7 +150,11 @@ def ego_config_handler(ego_config_file):
 
     return _ego_data
 
-if __name__ == "__main__":
+
+def tracks_generator():
+    """
+    From csv files to generate tracks
+    """
     ego_file, obj_file, ego_config_file = args_handler()
     ego_data = ego_config_handler(ego_config_file)
 
@@ -168,3 +172,20 @@ if __name__ == "__main__":
 
     # File Output
     write_output(pd_tracks, pd_tracks_meta, pd_recording)
+
+def tracks_to_labels():
+    """
+    Generate [1-35] NIO atomic labeling system from tracks data
+    """
+    df_tracks = pd.read_csv('results/tracks_result.csv')
+    pass
+
+if __name__ == "__main__":
+
+    # Step 1: 
+    #   Input:      ego.csv, obj.csv
+    #   Output:     tracks.csv tracks_meta.csv recording.csv 
+
+    # tracks_generator()
+
+    tracks_to_labels()

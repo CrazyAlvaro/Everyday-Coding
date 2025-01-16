@@ -11,9 +11,6 @@ Output: ./Results/
 
 
 ##########################
-
 ## Test
 
-inside ./test directory, run:
-
-- streamlit run validator.py
+Command: streamlit run scripts/test.py

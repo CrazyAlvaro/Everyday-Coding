@@ -14,31 +14,44 @@ class Label:
             'vehicle_id': self._veihicle_id,
             'type': self._type
         }
+    
+class LabelSystem:
+    """
+    Contain [1-35] labels
+    """
+
+    def __init__(self, labels):
+        self._label_system = labels
+
+    def to_dict(self):
+        return self._label_system
 
 
-class VehicleFrame:
+
+class VehicleFrameLabel:
     """
     Represent a specific time frame for an Vehicle/RU
     """
-    def __init__(self, vehicle_id, timestamp, frame):
+    def __init__(self, vehicle_id, timestamp, label_system):
         self._vehicle_id = vehicle_id
         self._timestamp = timestamp
-        self._frame = frame
-        self._labels = {}
+        # self._frame = frame
+        self._labels = label_system 
 
-    def update_label(self, id, label):
-        assert isinstance(id, int), "label id must be an integer"
-        assert 1 <= id <= 35, "label id must be between 1 and 35"
-        assert isinstance(label, Label), "label must be a Label type"
+    def get_vehicle_id(self):
+        return self._vehicle_id
 
-        self._labels[id] = label
+    # def update_label(self, id, label):
+        # assert isinstance(id, int), "[VehicleFrame] label id must be an integer"
+        assert 1 <= id <= 35, "[VehicleFrame] label id must be between 1 and 35"
+        # assert isinstance(label, Label), "[VehicleFrame] label must be a Label type"
+        # self._labels[id] = label
 
     def to_dict(self):
         return {
             'vehicle_id': self._vehicle_id,
             'timestamp': self._timestamp,
-            'frame': self._frame,
-            'labels': self._labels
+            'label_system': self._labels
         }
 
 class VehicleTrack:
@@ -47,7 +60,7 @@ class VehicleTrack:
     """
     def __init__(self, vehicle_id, frames):
         self._vehicle_id = vehicle_id
-        self._frames = frames
+        self._frames = frames # [VehicleFrameLabel]
 
     def to_dict(self):
         return {
@@ -55,12 +68,58 @@ class VehicleTrack:
             'frames': [_frame.to_dict() for _frame in self._frames]
         }
 
-class Tracks:
+class TimeframeVehicles:
+    def __init__(self, timestamp):
+        self._timestamp = timestamp
+        self._vehicles = {} 
+
+    def add_vehicle(self, vehicle_id, vehicle_frame_label):
+        assert isinstance(vehicle_frame_label, VehicleFrameLabel), "[TimeframeVehicles] vehicle_frame_label must be a VehicleFrameLabel"
+        # assert int(vehicle_id) == vehicle_frame_label.get_vehicle_id(), "[TimeframeVehicles] vehicle_id and vehicle_frame_label must for same vehicle"
+
+        self._vehicles[vehicle_id] = vehicle_frame_label
+
+    def get_timestamp(self):
+        return self._timestamp
+
+    def to_dict(self):
+        return {
+            'timestamp': self._timestamp,
+            'vehicles': self._vehicles
+        }
+
+class FullTimeframeVehicles:
+    def __init__(self, start_ts, end_ts, ts_rate):
+        self._start_timestamp = start_ts
+        self._end_timestamp = end_ts
+        self._timestamp_rate = ts_rate
+        self._tf_vehicles = []
+
+    def add_timeframe(self, timeframe_vehicles):
+        assert isinstance(timeframe_vehicles, TimeframeVehicles), "[FullTimeframeVehicles] timeframe_vehicles must be TimeframeVehicles type"
+        curr_timestamp = timeframe_vehicles.get_timestamp()
+        # assert self._start_timestamp <= curr_timestamp & self._end_timestamp >= curr_timestamp, "[FullTimeframeVehicles] timestamp not in between"
+    
+        self._tf_vehicles.append(timeframe_vehicles)
+
+    def to_dict(self):
+        return {
+            'start_timestamp': self._start_timestamp,
+            'end_timestamp': self._end_timestamp,
+            'timestamp_rate': self._timestamp_rate,
+            'timestamp_vehicles': [_ts_vehicle.to_dict() for _ts_vehicle in self._tf_vehicles]
+        }
+    
+    def to_json(self):
+        return json.dumps(self.to_dict(), indent=4)
+        
+        
+class TracksByVehicle:
     def __init__(self):
         self._tracks = []
 
     def add_track(self, track):
-        assert isinstance(track, VehicleTrack), "track must be a type of VehicleTrack"
+        assert isinstance(track, VehicleTrack), "[Tracks] track must be a type of VehicleTrack"
         self._tracks.append(track)
 
     def to_dict(self):
@@ -70,68 +129,3 @@ class Tracks:
 
     def to_json(self):
         return json.dumps(self.to_dict(), indent=4)
-
-
-
-
-
-
-
-
-
-def process_vehicles_by_frame(df):
-    """
-    Processes vehicles in each frame of the DataFrame.
-
-    Args:
-        df: pandas DataFrame with columns:
-            - 'frame'
-            - 'trackId'
-            - 'timestamp'
-            - 'vehicle_id'
-            - 'class_str'
-            - 'xCenter'
-            - 'yCenter'
-            - 'length'
-            - 'width'
-            - 'height'
-            - 'xVelocity'
-            - 'yVelocity'
-            - 'roadId'
-            - 'laneId'
-            - 'angle'
-
-    Returns:
-        DataFrame with potentially added columns or modifications based on
-        the 'run_function1' and 'run_function2' results.
-    """
-
-
-    # TODO:
-    # TODO instantiate an object, that contains the result, frame[timestamp] - vehicle[RU] - labels[1-35]
-
-
-    for frame, frame_df in df.groupby('frame'):
-        unique_vehicle_ids = frame_df['vehicle_id'].unique()
-        for vehicle_id in unique_vehicle_ids:
-            vehicle_data = frame_df[frame_df['vehicle_id'] == vehicle_id]
-
-            # check for RU
-            result1 = check_RU_same_direction(frame_df, vehicle_id)
-            result2 = check_RU_verticle(frame_df, vehicle_id)
-
-            # check for VRU
-            result3 = check_VRU(frame_df, vehicle_id)
-
-            # for current vehicle_id
-            # create a new [label_class] object to store [1-35] labels
-
-            # TODO: finally, an object that contains all timestamp frame, '
-            #       for each frame, contains a list of vehicle_id,
-            #       for each vehicle_id, contains an object contains [1-35] labels
-
-
-    return df  # Return the potentially modified DataFrame
-
-# Example usage (assuming you have defined run_function1 and run_function2)
-processed_df = process_vehicles_by_frame(your_dataframe)

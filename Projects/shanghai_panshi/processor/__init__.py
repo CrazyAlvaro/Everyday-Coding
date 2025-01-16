@@ -10,3 +10,13 @@ from .process import (
 from .check_surrounding import (
     check_surrounding_objects
 )
+
+from .tracks_label import (
+    Label,
+    LabelSystem,
+    VehicleFrameLabel,
+    VehicleTrack,
+    TimeframeVehicles,
+    FullTimeframeVehicles,
+    TracksByVehicle
+)

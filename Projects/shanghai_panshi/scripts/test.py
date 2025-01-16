@@ -107,7 +107,7 @@ def plot_data(data, frame):
     return fig
 
 def main():
-    file = '../results/tracks_result.csv'
+    file = 'results/tracks_result.csv'
 
     st.title('交互式轨迹可视化')
 
