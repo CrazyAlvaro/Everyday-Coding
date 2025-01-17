@@ -10,28 +10,30 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # This is needed to import the package if you're running the script directly
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Debug label
+_DEBUG = True
+
 from processor import (
-    preprocessor, 
-    ego_interpolate, 
-    obj_augment, 
+    preprocessor,
+    ego_interpolate,
+    obj_augment,
     check_surrounding_objects,
     calculate_ttc,
     reference_matching,
-    track_data_generator
+    track_data_generator,
+    check_surrounding_label
 )
 
 from metadata import(
-    time_interpolate_columns, 
+    time_interpolate_columns,
     shift_interpolate_columns,
     columns_tracks,
     columns_recording_meta,
     obj_time_cols,
     obj_shift_cols,
-    columns_tracks_meta
+    columns_tracks_meta,
+    columns_tracks_label
 )
-
-_log_level = "debug"
-_log_level = "run"
 
 def create_directory(path):
     try:
@@ -48,7 +50,7 @@ def read_input(ego_file = "ego.csv", obj_file = "obj.csv"):
         print(f"Reading input files failed: {e}")
         exit(1)
 
-    if _log_level == "debug":
+    if _DEBUG:
         print("ego len: {}, obj len: {}".format(len(df_ego), len(df_obj)))
 
     return df_ego, df_obj
@@ -66,7 +68,18 @@ def write_output(pd_tracks, pd_tracks_meta, pd_recording_meta):
         print("Error writing tracks output")
 
 def _data_processing(df_ego, df_obj, ego_obj_id, ego_config):
-    _verbose = True if _log_level == "debug" else False
+    # debug?
+    _verbose = True if _DEBUG else False
+    # atomic labeling system?
+    _label_system = True
+
+    _tracks_columns = None
+    if _label_system:
+        _tracks_columns = columns_tracks_label
+    else:
+        _tracks_columns = columns_tracks
+
+
     df_ego.sort_values(by='ts', inplace=True)
     _ego_timestamps = df_ego['ts']
 
@@ -79,16 +92,16 @@ def _data_processing(df_ego, df_obj, ego_obj_id, ego_config):
     _df_ego_augment, _ts_ego= preprocessor(df_ego, df_obj, ego_obj_id, shift_interpolate_columns, _verbose)
 
     ###########################################
-    # interpolate ego columns 
+    # interpolate ego columns
     ###########################################
     _df_ego_interpolated = ego_interpolate(_df_ego_augment, time_interpolate_columns,shift_interpolate_columns, ego_config, _verbose)
 
     ###########################################
     # concat df_obj with _df_ego_interpolated
-    # for each obj_id, augment timestamp with 
+    # for each obj_id, augment timestamp with
     # range include all timestamps using ego frame rate
     ###########################################
-    _df_obj_augment = obj_augment(df_obj, _df_ego_interpolated, _ts_ego, obj_time_cols, obj_shift_cols, _verbose) 
+    _df_obj_augment = obj_augment(df_obj, _df_ego_interpolated, _ts_ego, obj_time_cols, obj_shift_cols, _verbose)
 
     if _verbose:
         print("=== main_1 === {}".format(len(_df_obj_augment)))
@@ -96,23 +109,30 @@ def _data_processing(df_ego, df_obj, ego_obj_id, ego_config):
     ###########################################
     # Reference re-match for obj values based on ego reference frame
     ###########################################
-    _df_obj_ref = reference_matching(_df_obj_augment, ego_obj_id, columns_tracks, _verbose)
+    _df_obj_ref = reference_matching(_df_obj_augment, ego_obj_id, _tracks_columns, _verbose)
 
-    ###########################################
-    # Given obj and ego state value matched on the same reference frame
-    # check each vehicle's surrounding objects at each timestamp
-    ###########################################
-    _df_obj_srd = check_surrounding_objects(_df_obj_ref, ego_config)
-
-    ###########################################
-    # calculate ttc, thw 
-    ###########################################
-    _df_obj_cal = calculate_ttc(_df_obj_srd)
+    if _label_system:
+        ###########################################
+        # From atomic labeling system definition
+        # check each object surrounding labels
+        # after reference system aligned
+        ###########################################
+        _df_obj_cal = check_surrounding_label(_df_obj_ref)
+    else:
+        ###########################################
+        # Given obj and ego state value matched on the same reference frame
+        # check each vehicle's surrounding objects at each timestamp
+        ###########################################
+        ###########################################
+        # calculate ttc, thw
+        ###########################################
+        _df_obj_srd = check_surrounding_objects(_df_obj_ref, ego_config)
+        _df_obj_cal = calculate_ttc(_df_obj_srd)
 
     # df_obj_augment.to_csv("nine_box_tracks.csv")
 
-    return track_data_generator(_df_obj_cal, _ego_timestamps, columns_tracks, columns_recording_meta, _frame_rate)
-    
+    return track_data_generator(_df_obj_cal, _ego_timestamps, _tracks_columns, columns_recording_meta, _frame_rate, _label_system)
+
 def args_handler():
     ego_file = "ego.csv"
     obj_file = "obj.csv"
@@ -130,18 +150,18 @@ def args_handler():
         else:
             print("Please provide ego, obj and ego_config 3 files' path.")
     else:
-        print("No ego and obj file path provided.") 
-    
+        print("No ego and obj file path provided.")
+
     print(f"file path: \n ego file: {ego_file}\n obj file: {obj_file}\n ego_config file: {ego_config_file}")
     return ego_file, obj_file, ego_config_file
 
 def ego_config_handler(ego_config_file):
     with open(ego_config_file, 'r') as file:
         _ego_data = json.load(file)
-    
+
     required_keys = {"height", "width", "length"}
 
-    # validate 
+    # validate
     if required_keys.issubset(_ego_data.keys()):
         print("Ego config all keys are present.")
     else:
@@ -182,10 +202,10 @@ def tracks_to_labels():
 
 if __name__ == "__main__":
 
-    # Step 1: 
+    # Step 1:
     #   Input:      ego.csv, obj.csv
-    #   Output:     tracks.csv tracks_meta.csv recording.csv 
+    #   Output:     tracks.csv tracks_meta.csv recording.csv
 
-    # tracks_generator()
+    tracks_generator()
 
-    tracks_to_labels()
+    # tracks_to_labels()

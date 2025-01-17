@@ -1,6 +1,6 @@
 from .process import (
-    preprocessor, 
-    ego_interpolate, 
+    preprocessor,
+    ego_interpolate,
     obj_augment,
     calculate_ttc,
     reference_matching,
@@ -19,4 +19,8 @@ from .tracks_label import (
     TimeframeVehicles,
     FullTimeframeVehicles,
     TracksByVehicle
+)
+
+from .check_label import (
+    check_surrounding_label
 )

@@ -72,29 +72,32 @@ def plot_data(data, frame):
         u, v = row['xVelocity'], row['yVelocity']
         ax.quiver(x, y, u, v, angles='uv', scale_units='width', color='blue')
 
-    # set x, y axis in the same unit length 
+    # set x, y axis in the same unit length
     plt.axis('equal')
 
-    # 添加 trackId 和 vehicle_id  
+    # 添加 trackId 和 vehicle_id
     for i, (x, y) in enumerate(zip(filtered_data['xCenter'], filtered_data['yCenter'])):
         # print(type(filtered_data['trackId']))
         curr_track_id  = filtered_data['trackId'].iloc[i]
         plt.text(x, y, f"tkId: {curr_track_id}")
 
-    correspondence_table = filtered_data[['trackId', 'vehicle_id', 'precedingId',
-                                          'followingId', 'leftPrecedingId', 'leftAlongsideId', 'leftFollowingId',
-                                          'rightPrecedingId', 'rightAlongsideId', 'rightFollowingId',
-                                          'laneId']]
-    
+    # correspondence_table = filtered_data[['trackId', 'vehicle_id', 'precedingId',
+                                        #   'followingId', 'leftPrecedingId', 'leftAlongsideId', 'leftFollowingId',
+                                        #   'rightPrecedingId', 'rightAlongsideId', 'rightFollowingId',
+                                        #   'laneId']]
+    correspondence_table = filtered_data[['vehicle_id','frame', 'timestamp',
+              'ru1', 'ru2', 'ru3', 'ru4', 'ru5', 'ru6', 'ru7', 'ru8', 'ru9', 'ru10']]
+
     table_df = convert_df_to_int64(correspondence_table)
+    # table_df = correspondence_table
 
     table = plt.table(cellText=table_df.values,
                   colLabels=table_df.columns,
                   loc='bottom', cellLoc='center',
-                  bbox=[-0.5, -0.5, 1.8, 0.4])
+                  bbox=[-0.5, -0.5, 2.5, 0.4])
     table.auto_set_font_size(False)
-    table.set_fontsize(12)  # 设置字体大小
-    table.scale(4, 3.5)  # 调整表格大小
+    table.set_fontsize(10)  # 设置字体大小
+    table.scale(5, 4.5)  # 调整表格大小
 
     # 添加标题和坐标轴标签
     ax.set_title(f'Track Positions and Velocities at frame: {frame_id}')
