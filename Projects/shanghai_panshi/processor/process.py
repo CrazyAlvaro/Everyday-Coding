@@ -179,15 +179,9 @@ def _ensure_columns_exist_robust(df, column_names, verbose=False):
         return None
 
     try:
-        for col_name in column_names:
-            if col_name not in df.columns:
-                df[col_name] = 0
-
-                if verbose:
-                    print(f"Column '{col_name}' created.")
-            else:
-                if verbose:
-                    print(f"Column '{col_name}' already exists.")
+        missing_cols = [col for col in column_names if col not in df.columns]
+        if missing_cols:
+            df = pd.concat([df, pd.DataFrame(columns=missing_cols, index=df.index).fillna(0)], axis=1)
         return df
     except Exception as e: # Catch potential exceptions during column creation
         print(f"An error occurred: {e}")
