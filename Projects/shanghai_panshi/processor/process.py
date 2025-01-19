@@ -72,7 +72,7 @@ def ego_interpolate(df_ego_interpolated, time_intrplt_cols, shift_intrplt_cols, 
     df_ego_interpolated['height']  = ego_config['height']
 
     # assume ego is car
-    df_ego_interpolated['class_str']  = 'car'
+    df_ego_interpolated['class_str']  = 'Car'
 
     if _verbose:
         print("========= ego_interpolate ===========")

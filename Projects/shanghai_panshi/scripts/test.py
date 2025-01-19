@@ -29,13 +29,70 @@ def load_data(file):
     df = pd.read_csv(file)
     return df
 
+def display_dataframe_in_multiple_tables(df, columns_per_table=10):
+
+    """
+    Displays a DataFrame with more than 40 columns in multiple tables
+    using plt.table, with specified columns per table and
+    including index and id columns in each table.
+
+    Args:
+        df: The input DataFrame.
+        columns_per_table: The number of columns to display in each table.
+        index_col: The name of the index column.
+        id_col: The name of the id column.
+
+    Returns:
+        fig
+    """
+
+    num_cols = len(df.columns)
+    num_tables = np.ceil(num_cols / columns_per_table).astype(int)
+
+    fig, axes = plt.subplots(nrows=num_tables, figsize=(12, num_tables*3))
+
+    for i in range(num_tables):
+        start_col = i * columns_per_table
+        end_col = min((i + 1) * columns_per_table, num_cols)
+        table_cols = ['vehicle_id'] + list(df.columns[start_col:end_col])
+        table_data = df[table_cols].head(20).values  # Display first 20 rows
+
+        axes[i].axis('off')
+        axes[i].table(cellText=table_data,
+                    #  rowLabels=df.index[:20],
+                     colLabels=table_cols,
+                     cellLoc='center',
+                     loc='center')
+        # axes[i].set_title(f"Table {i+1}")
+
+    plt.tight_layout()
+    plt.show()
+    return fig
+
+def processing_data(data, frame):
+    # 筛选出指定时间戳的数据
+
+    frame_id= np.int64(frame)
+    filtered_data = data[data['frame'] == frame_id]
+    print("Current frame: {} with data length {}".format(frame_id, len(filtered_data)))
+
+    correspondence_table = filtered_data[['trackId', 'timestamp','frame','vehicle_id','laneId','class_str',
+              'ru1', 'ru2', 'ru3', 'ru4', 'ru5', 'ru6', 'ru7', 'ru8', 'ru9', 'ru10',
+              'ru11', 'ru12', 'ru13', 'ru14', 'ru15', 'ru16', 'ru17', 'ru18', 'ru19', 'ru20',
+              'ru21', 'ru22', 'ru23', 'ru24', 'ru25', 'ru26', 'ru27', 'ru28', 'ru29', 'ru30',
+              'ru31', 'ru32', 'ru33', 'ru34', 'ru35']]
+#
+    df = convert_df_to_int64(correspondence_table)
+
+    return df
+
 def plot_data(data, frame):
     """
     根据给定的数据和时间戳绘制散点图和速度向量图。
 
     Args:
         data: 包含轨迹数据的DataFrame。
-        timestamp: 要绘制的特定时间戳。
+        frame: 要绘制的特定时间戳。
 
     Returns:
         matplotlib.figure.Figure: 生成的图形对象。
@@ -43,22 +100,10 @@ def plot_data(data, frame):
 
     # 筛选出指定时间戳的数据
 
-    # print(data['timestamp'][1])
-    # print(type(data['timestamp'][1]))
-    # print(type(ts))
-    # print(ts)
-
     frame_id= np.int64(frame)
     filtered_data = data[data['frame'] == frame_id]
 
-    # 获取唯一的 trackId 列表
-    # unique_track_ids = filtered_data['trackId'].unique()
-
-    # 创建一个颜色列表
-    # cmap = plt.cm.get_cmap('jet')
-    # colors = [cmap(i) for i in np.linspace(0, 1, len(unique_track_ids))]
-
-    print("Current frame: {} with data length {}".format(frame_id, len(filtered_data)))
+    # print("Current frame: {} with data length {}".format(frame_id, len(filtered_data)))
 
     # 创建画布
     fig, ax = plt.subplots(figsize=(12, 10))
@@ -75,37 +120,15 @@ def plot_data(data, frame):
     # set x, y axis in the same unit length
     plt.axis('equal')
 
-    # 添加 trackId 和 vehicle_id
     for i, (x, y) in enumerate(zip(filtered_data['xCenter'], filtered_data['yCenter'])):
         # print(type(filtered_data['trackId']))
         curr_track_id  = filtered_data['trackId'].iloc[i]
-        plt.text(x, y, f"tkId: {curr_track_id}")
-
-    # correspondence_table = filtered_data[['trackId', 'vehicle_id', 'precedingId',
-                                        #   'followingId', 'leftPrecedingId', 'leftAlongsideId', 'leftFollowingId',
-                                        #   'rightPrecedingId', 'rightAlongsideId', 'rightFollowingId',
-                                        #   'laneId']]
-    correspondence_table = filtered_data[['vehicle_id','frame', 'timestamp',
-              'ru1', 'ru2', 'ru3', 'ru4', 'ru5', 'ru6', 'ru7', 'ru8', 'ru9', 'ru10']]
-
-    table_df = convert_df_to_int64(correspondence_table)
-    # table_df = correspondence_table
-
-    table = plt.table(cellText=table_df.values,
-                  colLabels=table_df.columns,
-                  loc='bottom', cellLoc='center',
-                  bbox=[-0.5, -0.5, 2.5, 0.4])
-    table.auto_set_font_size(False)
-    table.set_fontsize(10)  # 设置字体大小
-    table.scale(5, 4.5)  # 调整表格大小
+        plt.text(x, y, f"tk: {curr_track_id}")
 
     # 添加标题和坐标轴标签
     ax.set_title(f'Track Positions and Velocities at frame: {frame_id}')
     ax.set_xlabel('xCenter')
     ax.set_ylabel('yCenter')
-
-    # 添加颜色条
-    # plt.colorbar(scatter, label='trackId')
 
     return fig
 
@@ -121,8 +144,39 @@ def main():
     frame= st.text_input('请输入要查询的frame:')
 
     if st.button('绘制'):
-        fig = plot_data(df, frame)
+        fig = plot_data(df, frame) # multiple tables
         st.pyplot(fig)
+
+        # fig = plot_data(df, frame) # original: 1 table
+        df_processed = processing_data(df, frame)
+        fig_1 = display_dataframe_in_multiple_tables(df_processed, 6)
+        st.pyplot(fig_1)
+
 
 if __name__ == '__main__':
     main()
+
+
+# def plot
+    # correspondence_table = filtered_data[['trackId', 'vehicle_id','laneId','class_str',
+            #   'ru1', 'ru2', 'ru3', 'ru4', 'ru5', 'ru6', 'ru7', 'ru8', 'ru9', 'ru10']]
+            # 'timestamp','frame',
+            #   'ru11', 'ru12', 'ru13', 'ru14', 'ru15', 'ru16', 'ru17', 'ru18', 'ru19', 'ru20',
+            #   'ru21', 'ru22', 'ru23', 'ru24', 'ru25', 'ru26', 'ru27', 'ru28', 'ru29', 'ru30',
+            #   'ru31', 'ru32', 'ru33', 'ru34', 'ru35']]
+
+    # table_df = convert_df_to_int64(correspondence_table)
+    # table_df = correspondence_table
+
+    # table = plt.table(cellText=table_df.values,
+                #   colLabels=table_df.columns,
+                #   loc='bottom', cellLoc='center',
+                #   bbox=[-0.5, -0.5, 2.5, 0.4])
+    # table.auto_set_font_size(False)
+    # table.set_fontsize(10)  # 设置字体大小
+    # table.scale(5, 4.5)  # 调整表格大小
+
+    # 添加标题和坐标轴标签
+    # ax.set_title(f'Track Positions and Velocities at frame: {frame_id}')
+    # ax.set_xlabel('xCenter')
+    # ax.set_ylabel('yCenter')

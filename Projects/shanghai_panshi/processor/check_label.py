@@ -361,7 +361,7 @@ def _check_VRU(df_timeframe, ego_pos, ego_vel, ego_lane):
 
 def _construct_label(df_frame, _index, _RU_label):
     for _key, _val in _RU_label.items():
-        assert int(_key) >= 1 and int(_key) <= 35, "[check_label-_construct_label] Atomic labeling system index range [1-35]"
+        assert int(_key) >= 1 and int(_key) <= 35, "[check_label construct_label] Atomic labeling system index range [1-35]"
         df_frame.loc[_index, 'ru'+str(_key)] = _val
 
 def _timeframe_processing(df_ru, _index):
@@ -381,7 +381,7 @@ def _timeframe_processing(df_ru, _index):
     _ego_lane = _curr_row['lane_id']
 
     # set _ego_vel to pos dir if 0 vector
-    if _curr_row['xVelocity'] != 0 or  _curr_row['yVelocity'] != 0:
+    if _curr_row['xVelocity'] != 0 or _curr_row['yVelocity'] != 0:
         _ego_vel = (_curr_row['xVelocity'], _curr_row['yVelocity'])
     else:
         _ego_vel = (1,0)
@@ -414,13 +414,3 @@ def check_surrounding_label(df_ru):
         _construct_label(df_ru, _index, _labels_dict)
     # print('after out check {}'.format(df_ru.loc[0, 'ru1']))
     return df_ru
-
-############################################################
-##
-############################################################
-
-
-
-
-
-
