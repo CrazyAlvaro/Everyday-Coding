@@ -407,10 +407,6 @@ def check_surrounding_label(df_ru):
     # print('before out check {}'.format(df_ru.loc[0, 'ru1']))
     for _index in tqdm(df_ru.index, desc="Checking Atomic Labels"):
         _labels_dict = _timeframe_processing(df_ru, _index)
-
-        # if len(_labels_dict) > 0:
-            # print('Dict not 0: {}'.format(_labels_dict))
-
         _construct_label(df_ru, _index, _labels_dict)
-    # print('after out check {}'.format(df_ru.loc[0, 'ru1']))
+
     return df_ru

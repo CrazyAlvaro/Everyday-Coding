@@ -4,7 +4,7 @@ from shapely.geometry import Point, Polygon
 import matplotlib.pyplot as plt
 
 class IDIdentifier:
-    def __init__(self, file_path, line_file_path, before_change_index, after_change_index): 
+    def __init__(self, file_path, line_file_path, before_change_index, after_change_index):
         self.df = pd.read_csv(file_path)
         self.line_df = pd.read_csv(line_file_path)
         self.before_change_index = before_change_index
@@ -15,13 +15,13 @@ class IDIdentifier:
         self.lane_counts = None
         self.lane_boundaries = None
         self.get_vehicle_direction()
-    
+
 
     def get_vehicle_direction(self):
-        
+
         self.ego_yaw = self.line_df.iloc[0]['ego_yaw']
         self.ego_pos = self.line_df.iloc[0][['ego_x', 'ego_y']].values
-    
+
     def tangent_at_point(self, p1, p2):
         # 计算垂线的斜率和截距
         dx = p2[0] - p1[0]
@@ -65,11 +65,11 @@ class IDIdentifier:
                     if self.has_intersection(tangent, segment):
                         self.lane_counts[i] += 1
                         break
-    
+
     def reverse_lines_if_needed(self):
         # 选取self.df中任意一条线
         sample_line = self.df[self.df['cluster'] == self.df['cluster'].unique()[0]]
-        
+
         # 选择与ego_pos最近的相邻的两点
         DIS = sample_line[['x', 'y']].values - self.ego_pos
         data = np.array(DIS, dtype=np.float32)
@@ -77,12 +77,12 @@ class IDIdentifier:
         closest_indice = np.argsort(distances)[:1]
         closest_points_1 = sample_line.iloc[closest_indice][['x', 'y']].values
         closest_points_2 = sample_line.iloc[closest_indice+1][['x', 'y']].values
-        
+
         # 计算与ego_yaw的夹角
         vector = closest_points_2 - closest_points_1
         angle = np.arctan2(vector[0][1], vector[0][0]) - self.ego_yaw
         angle = np.degrees(angle)
-        
+
         # 若夹角大于90度，则将self.df中每条线的点倒序
         if abs(angle) > 90:
             print('Reverse lines')
@@ -96,11 +96,11 @@ class IDIdentifier:
         if change_index == None:
             print('没有找到由{}变{}的索引'.format(self.before_change_index, self.after_change_index))
             return
-        
+
         print('由{}变{}的索引：{}'.format(self.before_change_index, self.after_change_index, change_index))
 
         baseline_point = (self.baseline['x'].iloc[change_index], self.baseline['y'].iloc[change_index])
-        
+
         x0, y0 = baseline_point
         if change_index == 0:
             tangent = self.tangent_at_point((x0, y0), (self.baseline['x'].iloc[change_index+1], self.baseline['y'].iloc[change_index+1]))
@@ -151,17 +151,17 @@ class IDIdentifier:
 
         for road_id, road_group in self.df.groupby('road_id'):
             max_lane_order = road_group['lane_order'].max()
-            
+
             append_flag = False
             if road_id < max_road_id:
                 append_flag = True
-                
+
             # print('append_flag:', append_flag)
             for lane_order in range(max_lane_order):
                 cluster_left = road_group[road_group['lane_order'] == lane_order]['cluster'].values[0]
                 cluster_right = road_group[road_group['lane_order'] == lane_order + 1]['cluster'].values[0]
                 # print(cluster_left, cluster_right)
-                
+
                 if append_flag:
 
                     left_boundary_x_addition = self.df[(self.df['cluster']==cluster_left)&(self.df['road_id']==road_id+1)]['x'].values[0]
@@ -238,7 +238,7 @@ class IDIdentifier:
             if boundary['polygon'].contains(point):
                 return boundary['road_id'], boundary['lane_id']
         return -1, -1
-    
+
     def plot_vehicle_trajectory_and_lane_boundaries(self, lane_boundaries, line_df):
         plt.figure(figsize=(10, 10))
 
@@ -258,7 +258,7 @@ class IDIdentifier:
         plt.axis('equal')
         plt.legend()
         plt.show()
-    
+
     def add_info(self, file_folder, file_name):
         lane_boundaries = self.load_lane_boundaries()
 
@@ -277,7 +277,7 @@ class IDIdentifier:
         line_df.to_csv(file_folder + file_name + '_with_lane_info.csv', index=False)
         if file_name == 'ego':
             self.plot_vehicle_trajectory_and_lane_boundaries(lane_boundaries, line_df)
-    
+
     def run(self, case):
         # 按需对识别的车道线点进行倒序排序
         self.reverse_lines_if_needed()
@@ -300,7 +300,8 @@ class IDIdentifier:
 
 
 if __name__ == '__main__':
-    case = 'Xianyousuanfa'
+    # case = 'Xianyousuanfa'
+    case = 'Ganzhide'
     file_path = '../data/'+ case +'/line_processed.csv'
     line_file_path = '../data/' + case + '/line.csv'
     road_identifier = IDIdentifier(file_path, line_file_path, before_change_index=2, after_change_index=4)
