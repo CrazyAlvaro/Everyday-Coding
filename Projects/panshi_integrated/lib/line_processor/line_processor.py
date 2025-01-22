@@ -243,7 +243,7 @@ class LaneProcessor:
             plt.legend()
 
             folder_path = os.path.dirname(self.file_path)
-            plt.savefig(folder_path + 'extracted_line.png', dpi=600)
+            plt.savefig('results/extracted_line.png', dpi=600)
             plt.show()
             plt.close()
 
@@ -259,7 +259,7 @@ if __name__ == '__main__':
     # case = "Newcase2"
     case = "Ganzhide"
     line_case_path = '../data/'+ case +'/line.csv'
-    line_file_path = 'line.csv'
+    line_file_path = 'data/line.csv'
     # 确定超参数
     _filter = 1        # LD_end - LD_start := filter
     lastfit_degree=3        # 最后拟合车道边界的时候使用的多项式次数
@@ -272,4 +272,4 @@ if __name__ == '__main__':
     # processor.coordinate_transform_and_concatenate()
     processor.dbscan_on_absolute_coordinates()
     # processor.line.to_csv('../data/'+ case +'/line_processed.csv', index=False)
-    processor.line.to_csv('./result/line_processed.csv', index=False)
+    processor.line.to_csv('./results/line_processed.csv', index=False)

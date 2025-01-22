@@ -5,10 +5,11 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 
 class VirtualLane:
-    def __init__(self, config_path, degree=10, smooth_degree=7, max_curvature=0.1):
+    def __init__(self, config_path,casename, degree=10, smooth_degree=7, max_curvature=0.1):
         self.config = self.load_config(config_path)
-        self.file_path = self.config['vehicle_with_cluster_id']  # 输入文件路径
-        self.dected_lane_path = self.config['lane_boundaries']  # 检测到的车道边线路径
+        # self.case_name = self.config['case_name']  # 案例名称
+        self.file_path = "./results/"+ casename + "/" + self.config['vehicle_with_cluster_id']  # 输入文件路径
+        self.dected_lane_path = "./results/"+ casename + "/" + self.config['line_processed']  # 检测到的车道边线路径
         self.degree = degree    # 多项式拟合的阶数
         self.smooth_degree = smooth_degree  # 再次拟合的阶数
         self.max_curvature = max_curvature  # 曲率阈值
@@ -42,36 +43,125 @@ class VirtualLane:
         distances = np.sqrt((x_values - x_values)**2 + (y1 - y2)**2)
         return distances
 
+    def point_to_line_distance(self, point, line_start, line_end):
+        """计算点到线段的最小距离"""
+        px, py = point
+        ax, ay = line_start
+        bx, by = line_end
+
+        # 线段 AB 的向量
+        ab = np.array([bx - ax, by - ay])
+        ap = np.array([px - ax, py - ay])
+        bp = np.array([px - bx, py - by])
+
+        # 计算线段长度的平方
+        ab_sq = np.dot(ab, ab)
+
+        if ab_sq == 0:
+            # A 和 B 重合，直接返回到 A 的距离
+            return np.linalg.norm(ap)
+
+        # 投影比例 t
+        t = np.dot(ap, ab) / ab_sq
+
+        if t < 0:
+            # 投影点在线段 A 之外
+            return np.linalg.norm(ap)
+        elif t > 1:
+            # 投影点在线段 B 之外
+            return np.linalg.norm(bp)
+        else:
+            # 投影点在线段内
+            projection = line_start + t * ab
+            return np.linalg.norm(np.array(point) - projection)
+
+    def find_adjacent_lanes(self, cluster_data, distance_threshold=4.0):
+        """查找相邻的车道线"""
+        adjacency_list = []
+
+        # 获取所有聚类标签
+        clusters = cluster_data['cluster'].unique()  # 获取不连续的聚类标签
+
+        # 检查每对车道线的距离
+        for i in range(len(clusters)):
+            for j in range(i + 1, len(clusters)):
+                cluster1 = clusters[i]
+                cluster2 = clusters[j]
+
+                # 获取每个聚类的相关点
+                cluster_points1 = cluster_data[cluster_data['cluster'] == cluster1]
+                cluster_points2 = cluster_data[cluster_data['cluster'] == cluster2]
+
+                # 选择起点和终点作为线段代表，假设点按 x 排序
+                min_point1 = cluster_points1.iloc[0]
+                max_point1 = cluster_points1.iloc[-1]
+                min_point2 = cluster_points2.iloc[0]
+                max_point2 = cluster_points2.iloc[-1]
+
+                # 选取线段的起点和终点
+                line_start1 = (min_point1['x'], min_point1['y'])
+                line_end1 = (max_point1['x'], max_point1['y'])
+                line_start2 = (min_point2['x'], min_point2['y'])
+                line_end2 = (max_point2['x'], max_point2['y'])
+
+                # 计算两条线的最小距离
+                min_distance = min(
+                    self.point_to_line_distance(line_start1, line_start2, line_end2),
+                    self.point_to_line_distance(line_end1, line_start2, line_end2)
+                )
+
+                # 如果最小距离小于阈值，则认为它们相邻
+                if min_distance < distance_threshold:
+                    adjacency_list.append((cluster1, cluster2))
+
+        return adjacency_list
+
     def cal_lane_width(self):
         """计算车道宽度"""
+        width_list = [] # 存储每对相邻车道的宽度
         data = self.read_data(self.dected_lane_path)
+        self.adjacency_list = self.find_adjacent_lanes(data)
+        for cluster1, cluster2 in self.adjacency_list:
+            cluster_data1 = data[data['cluster'] == cluster1]
+            cluster_data2 = data[data['cluster'] == cluster2]
 
-        # 获取所有 boundary_id
-        boundary_ids = data['boundary_id'].unique()
+            # 拟合多项式
+            poly1 = self.fit_polynomial(cluster_data1['x'].values, cluster_data1['y'].values)
+            poly2 = self.fit_polynomial(cluster_data2['x'].values, cluster_data2['y'].values)
 
-        # 存储每个 boundary_id 的多项式拟合结果
-        polynomials = {}
-
-        for boundary_id, boundary_data in data.groupby('boundary_id'):
-            x = boundary_data['x'].values
-            y = boundary_data['y'].values
-            polynomials[boundary_id] = self.fit_polynomial(x, y)
-
-        # 计算相邻 boundary_id 车道线上各点的距离，并求平均距离
-        average_distances = []
-        for i in range(len(boundary_ids) - 1):
-            boundary_id1 = boundary_ids[i]
-            boundary_id2 = boundary_ids[i + 1]
-            poly1 = polynomials[boundary_id1]
-            poly2 = polynomials[boundary_id2]
-
-            # 取两个 boundary_id 车道线的 x 值的交集
-            x_values = np.linspace(min(data['x'].min(), data['x'].max()), max(data['x'].min(), data['x'].max()), 100)
-
+            # 计算相邻两车道的宽度
+            x_values = np.linspace(min(cluster_data1['x'].min(), cluster_data2['x'].min()), max(cluster_data1['x'].max(), cluster_data2['x'].max()), 100)
             distances = self.calculate_distances(poly1, poly2, x_values)
-            average_distance = np.mean(distances)
-            average_distances.append(average_distance)
-        return np.mean(average_distances)
+            width_list.append(np.mean(distances))
+
+        return np.mean(width_list)
+
+        # # 获取所有 boundary_id
+        # boundary_ids = data['boundary_id'].unique()
+
+        # # 存储每个 boundary_id 的多项式拟合结果
+        # polynomials = {}
+
+        # for boundary_id, boundary_data in data.groupby('boundary_id'):
+        #     x = boundary_data['x'].values
+        #     y = boundary_data['y'].values
+        #     polynomials[boundary_id] = self.fit_polynomial(x, y)
+
+        # # 计算相邻 boundary_id 车道线上各点的距离，并求平均距离
+        # average_distances = []
+        # for i in range(len(boundary_ids) - 1):
+        #     boundary_id1 = boundary_ids[i]
+        #     boundary_id2 = boundary_ids[i + 1]
+        #     poly1 = polynomials[boundary_id1]
+        #     poly2 = polynomials[boundary_id2]
+
+        #     # 取两个 boundary_id 车道线的 x 值的交集
+        #     x_values = np.linspace(min(data['x'].min(), data['x'].max()), max(data['x'].min(), data['x'].max()), 100)
+
+        #     distances = self.calculate_distances(poly1, poly2, x_values)
+        #     average_distance = np.mean(distances)
+        #     average_distances.append(average_distance)
+        # return np.mean(average_distances)
 
     def cal_offset_with_detected_line(self):
         pass
@@ -225,7 +315,7 @@ class VirtualLane:
         y_offset2 = y_center - offset * ny
         return (x_offset1, y_offset1), (x_offset2, y_offset2)
 
-    def get_lane_boundary(self):
+    def get_lane_boundary(self, file_path):
         """计算车道边界坐标点"""
         boundary_rows = []
         idx = 0
@@ -258,7 +348,7 @@ class VirtualLane:
                         boundary_rows.append({'boundary_id': idx, 'x': x, 'y': y, 'stdline_id': cluster_id})
                     idx += 1
         self.lane_boundary = pd.DataFrame(boundary_rows)
-        self.lane_boundary.to_csv('lane_boundaries111.csv', index=False)
+        self.lane_boundary.to_csv(file_path, index=False)
 
     def find_max_y_line(self, data, x_min, x_max):
         """找到所有线中 y 值平均值最大的线"""
@@ -320,79 +410,76 @@ class VirtualLane:
         # 平移 lane_boundaries111.csv 中的点
         self.lane_boundary['y'] -= offset
 
-    def plot_virtual_center_lines(self):
-        """绘制拟合的车道中心线"""
-        plt.figure(figsize=(10, 6))
-        rows = []
-        for lane_id, lane_data in self.trajectories.groupby('cluster_id'):
-            x = lane_data['x'].values
-            y = lane_data['y'].values
-            plt.scatter(x, y, label=f'Lane {lane_id} Scatter')
-            # 绘制拟合曲线
-            coeffs, x1, y1, x2, y2, label = self.lane_centrelines[lane_id]
-            x_fit_new = np.linspace(0, np.sqrt((x2 - x1)**2 + (y2 - y1)**2), 100)
-            y_fit_new = np.polyval(coeffs, x_fit_new)
-            x_fit, y_fit = self.inverse_transform_coordinates(x_fit_new, y_fit_new, x1, y1, x2, y2)
-            plt.plot(x_fit, y_fit, 'k', label=f'Lane {lane_id} Fit')
-            for x, y in zip(x_fit, y_fit):
-                rows.append({'cluster_id': lane_id, 'x': x, 'y': y})
-        # df = pd.DataFrame(rows)
-        # df.to_csv("lane_center.csv", index=False)
+def plot_virtual_center_lines(self):
+    """绘制拟合的车道中心线"""
+    plt.figure(figsize=(10, 6))
+    rows = []
+    for lane_id, lane_data in self.trajectories.groupby('cluster_id'):
+        x = lane_data['x'].values
+        y = lane_data['y'].values
+        plt.scatter(x, y, label=f'Lane {lane_id} Scatter')
+        # 绘制拟合曲线
+        coeffs, x1, y1, x2, y2, label = self.lane_centrelines[lane_id]
+        x_fit_new = np.linspace(0, np.sqrt((x2 - x1)**2 + (y2 - y1)**2), 100)
+        y_fit_new = np.polyval(coeffs, x_fit_new)
+        x_fit, y_fit = self.inverse_transform_coordinates(x_fit_new, y_fit_new, x1, y1, x2, y2)
+        plt.plot(x_fit, y_fit, 'k', label=f'Lane {lane_id} Fit')
+        for x, y in zip(x_fit, y_fit):
+            rows.append({'cluster_id': lane_id, 'x': x, 'y': y})
+    # df = pd.DataFrame(rows)
+    # df.to_csv("lane_center.csv", index=False)
 
-        plt.xlabel('X Coordinate')
-        plt.ylabel('Y Coordinate')
-        plt.legend()
-        plt.axis('equal')
-        plt.title('Virtual Lane Centerlines')
-        plt.show()
+    plt.xlabel('X Coordinate')
+    plt.ylabel('Y Coordinate')
+    plt.legend()
+    plt.axis('equal')
+    plt.title('Virtual Lane Centerlines')
+    plt.show()
 
-    def plot_lane_boundaries(self):
-        """绘制计算得到的车道边界"""
-        plt.figure(figsize=(10, 6))
+def plot_lane_boundaries(self):
+    """绘制计算得到的车道边界"""
+    plt.figure(figsize=(10, 6))
 
-        for lane_id, lane_data in self.trajectories.groupby('cluster_id'):
-            x = lane_data['x'].values
-            y = lane_data['y'].values
-            plt.scatter(x, y, label=f'Lane {lane_id} Scatter')
+    for lane_id, lane_data in self.trajectories.groupby('cluster_id'):
+        x = lane_data['x'].values
+        y = lane_data['y'].values
+        plt.scatter(x, y, label=f'Lane {lane_id} Scatter')
 
-        # for cluster_id, cluster_data in self.lane_std_line.groupby('recluster_id'):
-        #     plt.plot(cluster_data['x'], cluster_data['y'], label=f'Cluster {cluster_id} Standard Line', linestyle='--')
-        # 绘制车道边界
-        for boundary_id, boundary_data in self.lane_boundary.groupby('boundary_id'):
-            plt.plot(boundary_data['x'], boundary_data['y'], label='id:{}'.format(boundary_id))
+    # for cluster_id, cluster_data in self.lane_std_line.groupby('recluster_id'):
+    #     plt.plot(cluster_data['x'], cluster_data['y'], label=f'Cluster {cluster_id} Standard Line', linestyle='--')
+    # 绘制车道边界
+    for boundary_id, boundary_data in self.lane_boundary.groupby('boundary_id'):
+        plt.plot(boundary_data['x'], boundary_data['y'], label='id:{}'.format(boundary_id))
 
-        detec_lane = pd.read_csv(self.dected_lane_path)  # 检测到的车道边线
-        for lane_id, lane_data in detec_lane.groupby('boundary_id'):
-            x = lane_data['x'].values
-            y = lane_data['y'].values
-            plt.plot(x, y, 'k')
+    detec_lane = pd.read_csv(self.dected_lane_path)  # 检测到的车道边线
+    for lane_id, lane_data in detec_lane.groupby('cluster'):
+        x = lane_data['x'].values
+        y = lane_data['y'].values
+        plt.plot(x, y, 'k')
 
-        plt.xlabel('X Coordinate')
-        plt.ylabel('Y Coordinate')
-        plt.legend()
-        plt.axis('equal')
-        plt.title('Virtual Lane Boundaries')
-        plt.show()
+    plt.xlabel('X Coordinate')
+    plt.ylabel('Y Coordinate')
+    plt.legend()
+    plt.axis('equal')
+    plt.title('Virtual Lane Boundaries')
+    plt.show()
 
-    def run(self):
-        # 拟合车道中心线
-        self.fit_lane_centrelines()
-        # 对轨迹进行聚类，并对同类别内的轨迹求标准线
-        self.cluster_trajectories_and_refit()
-        # 计算车道边界
-        self.get_lane_boundary()
-        # 计算虚拟车道线与感知车道线的偏移量并进行平移
-        self.cal_offset_with_detected_line_and_translate()
-        # 绘制拟合的车道中心线
-        self.plot_virtual_center_lines()
-        # 绘制车道边界
-        self.plot_lane_boundaries()
-
-
+def run(self):
+    # 拟合车道中心线
+    self.fit_lane_centrelines()
+    # 对轨迹进行聚类，并对同类别内的轨迹求标准线
+    self.cluster_trajectories_and_refit()
+    # 计算车道边界
+    self.get_lane_boundary("../result/final_lane_boundaries.csv")
+    # 计算虚拟车道线与感知车道线的偏移量并进行平移
+    self.cal_offset_with_detected_line_and_translate()
+    # 绘制拟合的车道中心线
+    self.plot_virtual_center_lines()
+    # 绘制车道边界
+    self.plot_lane_boundaries()
 
 if __name__ == "__main__":
-    # config_file_path = './cfg/config.json'  # JSON 配置文件路径
-    config_file_path = 'config.json'  # JSON 配置文件路径
+    config_file_path = '../cfg/config.json'  # JSON 配置文件路径
     # 创建 TrajectoryFitting 对象
     virtual_lane = VirtualLane(config_file_path)
     virtual_lane.run()

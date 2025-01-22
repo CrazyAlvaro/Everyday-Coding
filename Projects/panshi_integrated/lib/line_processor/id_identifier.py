@@ -303,7 +303,7 @@ if __name__ == '__main__':
     # case = 'Xianyousuanfa'
     case = 'Ganzhide'
     # file_path = '../data/'+ case +'/line_processed.csv'
-    file_path = './result/line_processed.csv'
+    file_path = './results/line_processed.csv'
     # line_file_path = '../data/' + case + '/line.csv'
     line_file_path = './line.csv'
     road_identifier = IDIdentifier(file_path, line_file_path, before_change_index=2, after_change_index=4)

@@ -1,16 +1,17 @@
 import json
+import os
 import pandas as pd
 import numpy as np
 
 
 class TrajectoryProcessor:
-    def __init__(self, config_path):
+    def __init__(self, config_path, casename):
         """
         初始化 TrajectoryProcessor 类，加载配置参数。
         :param config_path: JSON 配置文件路径
         """
         self.config = self.load_config(config_path)
-        self.filepath = self.config['obj_file']  # 输入文件路径
+        self.filepath = "./results/"+ casename + "/" + self.config['tracks_file']  # 输入文件路径
         self.T1 = self.config['params']['T1']  # 轨迹点数阈值 T1
         self.T2 = self.config['params']['T2']  # 横纵坐标方差阈值 T2，T3
         self.T3 = self.config['params']['T3']
@@ -18,7 +19,7 @@ class TrajectoryProcessor:
         self.lateral_threshold = self.config['params']['lateral_threshold']  # 侧偏阈值
         self.yaw_rate_threshold = self.config['params']['yaw_rate_threshold']  # 航向角变化速率阈值
         self.ay_threshold = self.config['params']['ay_threshold']  # 纵向加速度阈值
-        self.outputfile = self.config['valid_trajectories_file']  # 输出文件路径
+        self.outputfile = "./results/"+ casename + "/" + self.config['valid_trajectories_file']  # 输出文件路径
         self.df = None
 
     @staticmethod
@@ -30,6 +31,7 @@ class TrajectoryProcessor:
     @staticmethod
     def read_data(file_path):
         """读取 CSV 文件并返回 DataFrame"""
+        # os.makedirs(os.path.dirname(file_path), exist_ok=True)
         return pd.read_csv(file_path)
 
     @staticmethod
@@ -113,6 +115,6 @@ class TrajectoryProcessor:
 
 # 使用示例
 if __name__ == "__main__":
-    config_file_path = './cfg/config.json'  # JSON 配置文件路径
+    config_file_path = '../cfg/config.json'  # JSON 配置文件路径
     processor = TrajectoryProcessor(config_file_path)
     processor.process_data()

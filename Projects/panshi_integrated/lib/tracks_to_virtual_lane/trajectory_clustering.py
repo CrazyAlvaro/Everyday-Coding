@@ -6,17 +6,18 @@ import json
 
 
 class TrajectoryClustering:
-    def __init__(self, config_path):
+    def __init__(self, config_path,casename):
         """
         初始化 TrajectoryClustering 类，从配置文件加载参数。
 
         :param config_path: JSON 配置文件路径
         """
         self.config = self.load_config(config_path)
-        self.file_path = self.config['valid_trajectories_file']  # 输入文件路径
+        # self.case_name = self.config['case_name']  # 案例名称
+        self.file_path = "./results/"+ casename + "/" + self.config['valid_trajectories_file']  # 输入文件路径
         self.eps = self.config['params']['eps']  # 邻域半径
         self.min_samples = self.config['params']['min_samples']  # 核心点的最少样本数
-        self.output_file = self.config['vehicle_with_cluster_id']  # 输出文件路径
+        self.output_file = "./results/"+ casename + "/" + self.config['vehicle_with_cluster_id']  # 输出文件路径
         self.data = None
         self.segments = []
         self.vehicle_ids = []
@@ -101,6 +102,6 @@ class TrajectoryClustering:
 
 # 使用示例
 if __name__ == "__main__":
-    config_path = './cfg/config.json'  # 配置文件路径
+    config_path = '../cfg/config.json'  # 配置文件路径
     clustering = TrajectoryClustering(config_path)
     clustering.run()
