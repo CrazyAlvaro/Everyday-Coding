@@ -16,7 +16,6 @@ class IDIdentifier:
         self.lane_boundaries = None
         self.get_vehicle_direction()
 
-
     def get_vehicle_direction(self):
 
         self.ego_yaw = self.line_df.iloc[0]['ego_yaw']
@@ -295,8 +294,8 @@ class IDIdentifier:
         # self.lane_boundaries.to_csv('../data/'+ case +'/lane_boundaries.csv', index=False)
 
         # 为车辆轨迹数据添加车道信息
-        self.add_info('../data/'+ case +'/', 'ego')
-        self.add_info('../data/'+ case +'/', 'obj')
+        self.add_info('data/'+ case +'/', 'ego')
+        self.add_info('data/'+ case +'/', 'obj')
 
 
 if __name__ == '__main__':

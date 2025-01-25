@@ -31,4 +31,7 @@ from .metadata import (
     shift_interpolate_columns, obj_time_cols, obj_shift_cols
 )
 
-from .raw_tracks import raw_tracks_generator
+from .raw_tracks import (
+    raw_tracks_generator,
+    path_handler
+)

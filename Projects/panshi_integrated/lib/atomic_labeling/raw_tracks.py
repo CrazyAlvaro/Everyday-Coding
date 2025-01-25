@@ -141,6 +141,22 @@ def _data_processing(df_ego, df_obj, ego_obj_id, ego_config):
     # return track_data_generator(_df_obj_cal, _ego_timestamps, columns_tracks, columns_recording_meta, _frame_rate)
     return track_data_generator(_df_obj_ref, _ego_timestamps, columns_tracks, columns_recording_meta, _frame_rate)
 
+
+def ego_config_handler(ego_config_file):
+    with open(ego_config_file, 'r') as file:
+        _ego_data = json.load(file)
+
+    required_keys = {"height", "width", "length"}
+
+    # validate
+    if required_keys.issubset(_ego_data.keys()):
+        print("Ego config all keys are present.")
+    else:
+        missing_keys = required_keys - _ego_data.keys()
+        print(f"Missing ego keys: {missing_keys}")
+
+    return _ego_data
+
 def path_handler(data_path):
     # data_path="data/"
     case_names = get_all_file_name(data_path)
@@ -155,7 +171,7 @@ def path_handler(data_path):
     for case_name in case_names:
         ego_file = f"{data_path}/{case_name}/ego.csv"
         obj_file = f"{data_path}/{case_name}/obj.csv"
-        ego_config_file = "data/ego_config.json"
+        ego_config_file = "config/ego_config.json"
 
         if len(sys.argv) > 1:
             print("Arguments passed:", sys.argv[1:])  # Print all arguments except the script name
@@ -178,42 +194,19 @@ def path_handler(data_path):
 
     return files_info
 
-def ego_config_handler(ego_config_file):
-    with open(ego_config_file, 'r') as file:
-        _ego_data = json.load(file)
+# def raw_tracks_generator(data_folder):
+def raw_tracks_generator(ego_file, obj_file, ego_config_file, case_name):
 
-    required_keys = {"height", "width", "length"}
+    # for ego_file, obj_file, ego_config_file, case_name in files_info:
 
-    # validate
-    if required_keys.issubset(_ego_data.keys()):
-        print("Ego config all keys are present.")
-    else:
-        missing_keys = required_keys - _ego_data.keys()
-        print(f"Missing ego keys: {missing_keys}")
+    ego_data = ego_config_handler(ego_config_file)
+    ego_obj_id = 1
 
-    return _ego_data
+    # File Input
+    df_ego, df_obj = read_input(ego_file, obj_file)
 
-def raw_tracks_generator(data_folder):
-    files_info = path_handler(data_folder)
+    # Data Prcess and Tracks Generate
+    pd_tracks, _, _= _data_processing(df_ego, df_obj, ego_obj_id, ego_data)
 
-    # Process each case
-    for ego_file, obj_file, ego_config_file, case_name in files_info:
-        print(f"Processing case '{case_name}'")
-        ego_data = ego_config_handler(ego_config_file)
-
-        # print("==================================================================================\n")
-        # print(" 5 Steps: Obj_Augment, Reference_Matching, Checking_Surroundings, TTC_THW, Tracks_Stats\n")
-        # print("==================================================================================\n")
-
-        ego_obj_id = 1
-
-        # File Input
-        df_ego, df_obj = read_input(ego_file, obj_file)
-
-        # Data Prcess and Tracks Generate
-        pd_tracks, pd_tracks_meta, pd_recording = _data_processing(df_ego, df_obj, ego_obj_id, ego_data)
-
-        # File Output
-        write_output(pd_tracks, case_name)
-
-    return files_info
+    # File Output
+    write_output(pd_tracks, case_name)

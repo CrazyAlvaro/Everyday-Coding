@@ -1,13 +1,67 @@
-
 from lib.tracks_to_virtual_lane import (
     TrajectoryProcessor,
     TrajectoryClustering
 )
+
 from lib.line_processor import (
     VirtualLane,
-    LaneProcessor
+    LaneProcessor,
+    IDIdentifier
 )
-from lib.atomic_labeling import raw_tracks_generator
+
+from lib.atomic_labeling import (
+    raw_tracks_generator,
+    path_handler
+)
+
+import pandas as pd
+from sklearn.cluster import DBSCAN
+def integrate_line_and_virtual(case_folder, case_name):
+    """
+    integrate virtual line and original sensed line together, and then cluster to lines
+    """
+
+    _file_line_processed = case_folder + case_name + '/line_processed.csv'
+    _file_virtual_line = case_folder + case_name + '/lane_boundaries_tracks.csv'
+
+    # read virtual_line, line_processed
+    df_line_processed = pd.read_csv(_file_line_processed)
+    df_virtual_line = pd.read_csv(_file_virtual_line)
+
+    # concat two dataframes
+    common_columns = ['x', 'y']
+    df_lp = df_line_processed[common_columns]
+    df_vl = df_virtual_line[common_columns]
+
+    combined_df = pd.concat([df_lp, df_vl], ignore_index=True)
+
+    # cluster use DBSCAN
+    dbscan = DBSCAN(eps=0.5, min_samples=2)
+    combined_df["cluster"] = dbscan.fit_predict(combined_df)
+
+    # output to final_line as line_processed format
+    _output_file = case_folder + case_name + '/line_combined.csv'
+    combined_df.to_csv(_output_file, index=False)
+
+    return combined_df
+
+def line_id_identifier(data_folder, result_folder, case_name):
+    """
+    labeling integrated line_combined, then enrich original ego.csv and obj.csv
+    """
+    _original_line_path  = data_folder + case_name + '/line.csv'
+    _line_processed_path = result_folder + case_name + '/line_combined.csv'
+
+    # TODO how they are determined?
+    _before_index = 2
+    _after_index = 4
+
+    _line_identifier = IDIdentifier(_line_processed_path, _original_line_path, _before_index, _after_index)
+    _line_identifier.run(case_name)
+
+# TODO next function, atomic_labeling
+def atomic_labeling():
+    pass
 
 def tracks_to_virtual(config_file_path, case_name):
     #----轨迹过滤----#
@@ -61,14 +115,30 @@ if __name__ == "__main__":
     case_folder = 'data/'
 
     # generate tracks and line_processed from data directory, get directory file info
-    files_info = raw_tracks_generator(case_folder)
+    files_info = path_handler(case_folder)
+
 
     for _ego_file, _obj_file, _ego_config_file, _case_name in files_info:
         # case_name = "2c989271-6833-484d-b4db-3db05ed81df3"
 
+        # log case
+        print('Case {} \nego {} \nobj {} \nego_config {} \n'.format(
+            _ego_file, _obj_file, _ego_config_file, _case_name))
+
+        raw_tracks_generator(_ego_file, _obj_file, _ego_config_file, _case_name)
+
         # process line.csv generate line_processed.csv
         line_processing(_case_name)
 
-        # for each case directory, generate virtual line from tracks
+        # for each case, generate virtual line from tracks
         # generate: lane_boundaries_tracks.csv
         tracks_to_virtual(config_file_path, _case_name)
+
+        # integrate line_processed.csv and lane_boundaries_tracks.csv, cluster them
+        integrate_line_and_virtual('results/', _case_name)
+
+        # label id, enrich ego/obj to ego_with_lane_info.csv, obj_with_lane_info.csv
+        line_id_identifier(case_folder, 'results/', _case_name)
+
+        # input ego_with_lane, obj_with_lane,
+        # atomic_labeling()
