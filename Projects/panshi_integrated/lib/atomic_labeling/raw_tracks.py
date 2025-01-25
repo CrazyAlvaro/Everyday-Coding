@@ -41,7 +41,7 @@ def get_all_file_name(path):
             if os.path.isdir(path + file):
                 case_name.append(file)
     else:
-        print("path not exist")
+        print("No case found under directory: {}".format(path))
     return case_name
 
 
@@ -65,7 +65,7 @@ def read_input(ego_file = "ego.csv", obj_file = "obj.csv"):
 
     return df_ego, df_obj
 
-def write_output(pd_tracks, case_name):
+def get_tracks(pd_tracks, case_name):
     create_directory(f"results/{case_name}")
 
     try:
@@ -87,8 +87,9 @@ def write_output(pd_tracks, case_name):
 
         })
         # 保存到csv文件
-        pd_tracks.to_csv(f'results/{case_name}/tracks_result.csv', index=False)
-        print("Output Tracks File in Results/")
+        # pd_tracks.to_csv(f'results/{case_name}/tracks_result.csv', index=False)
+        # print("Output Tracks File in Results/")
+        return pd_tracks
     except OSError as error:
         print("Error writing tracks output")
 
@@ -162,7 +163,7 @@ def path_handler(data_path):
     case_names = get_all_file_name(data_path)
 
     if not case_names:
-        print("No case names found.")
+        print("No case names found under {}".format(data_path))
         exit(1)
 
     # Store all file paths
@@ -172,22 +173,6 @@ def path_handler(data_path):
         ego_file = f"{data_path}/{case_name}/ego.csv"
         obj_file = f"{data_path}/{case_name}/obj.csv"
         ego_config_file = "config/ego_config.json"
-
-        if len(sys.argv) > 1:
-            print("Arguments passed:", sys.argv[1:])  # Print all arguments except the script name
-
-            # Accessing specific arguments
-            if len(sys.argv) > 2:
-                ego_file = sys.argv[1]
-                obj_file = sys.argv[2]
-                ego_config_file = sys.argv[3]
-                print(f"ego file: {ego_file}, obj file: {obj_file}, ego_config file: {ego_config_file}")
-            else:
-                print("Please provide ego, obj and ego_config 3 files' path.")
-        else:
-            print("No ego and obj file path provided.")
-
-        print(f"file path for case '{case_name}': \n eg file: {ego_file}\n obj file: {obj_file}\n ego_config file: {ego_config_file}")
 
         # Store file paths in files_info
         files_info.append((ego_file, obj_file, ego_config_file, case_name))
@@ -209,4 +194,6 @@ def raw_tracks_generator(ego_file, obj_file, ego_config_file, case_name):
     pd_tracks, _, _= _data_processing(df_ego, df_obj, ego_obj_id, ego_data)
 
     # File Output
-    write_output(pd_tracks, case_name)
+    df_tracks = get_tracks(pd_tracks, case_name)
+
+    return df_tracks
