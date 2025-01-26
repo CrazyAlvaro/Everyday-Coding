@@ -16,7 +16,8 @@ from lib.line_processor import (
 
 from lib.atomic_labeling import (
     raw_tracks_generator,
-    path_handler
+    path_handler,
+    tracks_generator
 )
 
 def integrate_line_and_virtual(df_line_processed, df_virtual_line):
@@ -59,10 +60,6 @@ def line_id_identifier(data_folder, result_folder, case_name):
 
     _line_identifier = IDIdentifier(_line_processed_path, _original_line_path, _before_index, _after_index)
     _line_identifier.run(case_name)
-
-# TODO next function, atomic_labeling
-def atomic_labeling():
-    pass
 
 def tracks_to_virtual(config_file_path, case_name):
     #----轨迹过滤----#
@@ -138,10 +135,16 @@ def tracks_to_virtual_line_by_width(df_tracks, lane_width=3.75):
     # Create the new dataframe df2
     return pd.concat([calculate_perpendicular_points(row, lane_width/2) for _, row in df_tracks.iterrows()], ignore_index=True)
 
-def plot_df(df, _case_name, _plot_name):
+def plot_df(df, _case_name, _plot_name, actually_plot=False, cluster=False):
     # Plot the (x, y) points
     plt.figure(figsize=(8, 8))
-    plt.scatter(df['x'], df['y'], color='blue', label='Points')
+
+    # use groupby to plot each cluster seprately with a unique color
+    if cluster:
+        for _cluster, _group in df.groupby('cluster'):
+            plt.scatter(_group['x'], _group['y'], label=f'Cluster {_cluster}')
+    else:
+        plt.scatter(df['x'], df['y'], color='blue', label='Points')
 
     # Add grid, labels, and title
     plt.grid(True, linestyle='--', alpha=0.7)
@@ -154,7 +157,8 @@ def plot_df(df, _case_name, _plot_name):
     plt.savefig(f'results/{_case_name}/{_plot_name}.png', dpi=300, bbox_inches='tight')  # Save as PNG with high resolution
 
     # Show the plot
-    # plt.show()
+    if actually_plot:
+        plt.show()
 
 if __name__ == "__main__":
     config_file_path = './config/config.json'  # JSON 配置文件路径
@@ -193,13 +197,15 @@ if __name__ == "__main__":
         # integrate line_processed.csv and lane_boundaries_tracks.csv, cluster them
         df_combined_line = integrate_line_and_virtual(df_line_processed, df_virtual_line)
         df_combined_line.to_csv(f'results/{_case_name}/line_combined.csv', index=False)
-        plot_df(df_combined_line, _case_name, 'combined_line.png')
+        plot_df(df_combined_line, _case_name, 'combined_line.png', cluster=True)
+
+
         # TODO: Post processing cluster data
 
         # TODO: id lane
         # label id, enrich ego/obj to ego_with_lane_info.csv, obj_with_lane_info.csv
         # line_id_identifier(case_folder, 'results/', _case_name)
 
-        # TODO integrate atomic_labeling
+        # integrate atomic_labeling
         # input ego_with_lane, obj_with_lane,
-        # atomic_labeling()
+        # tracks_generator(_case_name, _ego_file, _obj_file, _ego_config_file)
